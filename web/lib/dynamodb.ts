@@ -9,7 +9,7 @@ import {
 import { randomUUID } from 'crypto'
 
 const clientConfig = {
-  region: process.env.AWS_REGION || 'eu-west-1',
+  region: process.env.APP_AWS_REGION || process.env.AWS_REGION || 'eu-west-1',
   ...(process.env.APP_AWS_ACCESS_KEY_ID
     ? {
         credentials: {

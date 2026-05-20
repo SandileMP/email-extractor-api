@@ -99,11 +99,9 @@ resource "aws_route53_record" "cert_validation" {
   allow_overwrite = true
 }
 
-resource "aws_acm_certificate_validation" "scrapify" {
-  provider                = aws.us_east_1
-  certificate_arn         = aws_acm_certificate.scrapify.arn
-  validation_record_fqdns = [for r in aws_route53_record.cert_validation : r.fqdn]
-}
+# Note: aws_acm_certificate_validation is intentionally omitted.
+# The cert validates automatically once scrapify.io nameservers point to Route 53.
+# Check status: aws acm describe-certificate --certificate-arn <arn> --region us-east-1
 
 # ── Amplify app ───────────────────────────────────────────────────────────
 
@@ -141,7 +139,7 @@ resource "aws_amplify_app" "scrapify" {
     USERS_TABLE                  = aws_dynamodb_table.users.name
     API_KEYS_TABLE               = aws_dynamodb_table.api_keys.name
     SUBSCRIPTIONS_TABLE          = aws_dynamodb_table.subscriptions.name
-    AWS_REGION_OVERRIDE          = "eu-west-1"
+    APP_AWS_REGION               = "eu-west-1"
     # Secrets injected below (marked sensitive)
     PAYSTACK_SECRET_KEY          = data.aws_ssm_parameter.paystack_secret.value
     JWT_SECRET                   = data.aws_ssm_parameter.jwt_secret.value
