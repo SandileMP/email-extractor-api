@@ -92,15 +92,17 @@ export async function POST(req: NextRequest) {
     if (type === 'subscription.disable' || type === 'subscription.not_renew') {
       const subCode: string = data.subscription_code
       const { data: sub } = await supabase
-        .from('subscriptions').select('user_id, user:user_id(email)').eq('subscription_code', subCode).maybeSingle()
+        .from('subscriptions').select('user_id').eq('subscription_code', subCode).maybeSingle()
 
       if (sub) {
         await supabase.from('subscriptions')
           .update({ status: 'inactive', updated_at: new Date().toISOString() })
           .eq('subscription_code', subCode)
         await supabase.from('api_keys').update({ active: false }).eq('user_id', sub.user_id)
-        const email = (sub.user as { email: string } | null)?.email ?? ''
-        if (email) await deactivateKeysInDynamo(email)
+        // Look up email to deactivate DynamoDB key too
+        const { data: { users } } = await supabase.auth.admin.listUsers()
+        const u = users.find(x => x.id === sub.user_id)
+        if (u?.email) await deactivateKeysInDynamo(u.email)
         logger.info('Subscription deactivated', { ...ctx, subCode })
       }
     }
