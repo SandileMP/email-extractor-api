@@ -1,7 +1,7 @@
-import { createServerClient, type CookieMethodsServer } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
 
-type CookieToSet = Parameters<CookieMethodsServer['setAll']>[0][number]
+type CookieToSet = { name: string; value: string; options?: Record<string, unknown> }
 
 export function createClient(request: NextRequest) {
   let response = NextResponse.next({ request: { headers: request.headers } })
