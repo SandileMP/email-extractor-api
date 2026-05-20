@@ -27,6 +27,11 @@ data "aws_ssm_parameter" "jwt_secret" {
   with_decryption = true
 }
 
+data "aws_ssm_parameter" "supabase_service_key" {
+  name            = "/meshparse/supabase-service-role-key"
+  with_decryption = true
+}
+
 # ── IAM user for web app → DynamoDB ──────────────────────────────────────
 
 resource "aws_iam_user" "web_app" {
@@ -109,7 +114,7 @@ resource "aws_amplify_app" "meshparse" {
   name         = "meshparse"
   repository   = "https://github.com/SandileMP/email-extractor-api"
   access_token = var.github_token
-  platform     = "WEB_COMPUTE"
+  platform     = "WEB"  # Static hosting — no SSR Lambda
 
   build_spec = <<-YAML
     version: 1
@@ -124,7 +129,7 @@ resource "aws_amplify_app" "meshparse" {
               commands:
                 - npm run build
           artifacts:
-            baseDirectory: .next
+            baseDirectory: out
             files:
               - '**/*'
           cache:
@@ -132,45 +137,19 @@ resource "aws_amplify_app" "meshparse" {
               - node_modules/**/*
   YAML
 
+  # Only NEXT_PUBLIC_ vars needed — baked into static bundle at build time
   environment_variables = {
-    NEXT_PUBLIC_APP_URL          = "https://${var.domain_name}"
-    NEXT_PUBLIC_PAYSTACK_PK      = "pk_live_5b9371ddaae8fca03b7bf55f80a247990ac268a0"
-    PAYSTACK_PLAN_CODE           = "PLN_bsy0r947pyura5e"
-    USERS_TABLE                  = aws_dynamodb_table.users.name
-    API_KEYS_TABLE               = aws_dynamodb_table.api_keys.name
-    SUBSCRIPTIONS_TABLE          = aws_dynamodb_table.subscriptions.name
-    APP_AWS_REGION               = "eu-west-1"
-    # Secrets injected below (marked sensitive)
-    PAYSTACK_SECRET_KEY          = data.aws_ssm_parameter.paystack_secret.value
-    JWT_SECRET                   = data.aws_ssm_parameter.jwt_secret.value
-    APP_AWS_ACCESS_KEY_ID        = aws_iam_access_key.web_app.id
-    APP_AWS_SECRET_ACCESS_KEY    = aws_iam_access_key.web_app.secret
+    NEXT_PUBLIC_APP_URL            = "https://${var.domain_name}"
+    NEXT_PUBLIC_SUPABASE_URL       = "https://ajyrrxrxcywooyrahioi.supabase.co"
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqeXJyeHJ4Y3l3b295cmFoaW9pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDQzNTIsImV4cCI6MjA5NDg4MDM1Mn0.XDu6729rTcHL5M9boQPaB3puoQdvQpWnnqCuHX3B_VI"
+    NEXT_PUBLIC_CHECKOUT_URL       = "${aws_apigatewayv2_stage.default.invoke_url}checkout"
   }
 }
 
-resource "aws_amplify_branch" "main" {
-  app_id            = aws_amplify_app.meshparse.id
-  branch_name       = "main"
-  enable_auto_build = true
-  framework         = "Next.js - SSR"
-  stage             = "PRODUCTION"
-}
+# Branch and domain association managed outside Terraform
+# (Amplify auto-creates branches on push; domain managed via console)
 
-resource "aws_amplify_domain_association" "meshparse" {
-  app_id      = aws_amplify_app.meshparse.id
-  domain_name = var.domain_name
-  wait_for_verification = false
-
-  sub_domain {
-    branch_name = aws_amplify_branch.main.branch_name
-    prefix      = ""
-  }
-
-  sub_domain {
-    branch_name = aws_amplify_branch.main.branch_name
-    prefix      = "www"
-  }
-}
+# Domain association managed via Amplify console after domain validates
 
 # ── Outputs ───────────────────────────────────────────────────────────────
 
