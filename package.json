@@ -1,0 +1,8 @@
+{
+  "name": "email-extractor-api",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "next": "^14.2.0"
+  }
+}
