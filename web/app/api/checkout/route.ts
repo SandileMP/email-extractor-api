@@ -1,17 +1,33 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { initializeTransaction } from '@/lib/paystack'
+import { logger } from '@/lib/logger'
 
 export async function POST() {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const ctx = { route: 'POST /api/checkout' }
 
-  const result = await initializeTransaction(session.email)
+  try {
+    const session = await getSession()
+    if (!session) {
+      logger.warn('Unauthenticated checkout attempt', ctx)
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-  if (!result.status) {
-    console.error('Paystack error:', result)
-    return NextResponse.json({ error: 'Could not initialize payment' }, { status: 502 })
+    logger.info('Initializing Paystack transaction', { ...ctx, email: session.email })
+    const result = await initializeTransaction(session.email)
+    logger.info('Paystack response', { ...ctx, status: result.status, message: result.message })
+
+    if (!result.status) {
+      logger.error('Paystack initialization failed', undefined, {
+        ...ctx,
+        paystackMessage: result.message,
+      })
+      return NextResponse.json({ error: 'Could not initialize payment' }, { status: 502 })
+    }
+
+    return NextResponse.json({ url: result.data.authorization_url })
+  } catch (err) {
+    logger.error('Checkout error', err, ctx)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
-
-  return NextResponse.json({ url: result.data.authorization_url })
 }
