@@ -69,7 +69,7 @@ resource "aws_lambda_function" "checkout" {
   environment {
     variables = {
       PAYSTACK_SECRET_KEY = data.aws_ssm_parameter.paystack_secret.value
-      PAYSTACK_PLAN_CODE  = "PLN_bsy0r947pyura5e"
+      PAYSTACK_PLAN_CODE  = "PLN_y8k9doi50zd8vqh"   # R10 test plan (switch to PLN_bsy0r947pyura5e for R750 prod)
       APP_URL             = "https://meshparse.com"
     }
   }
@@ -133,14 +133,18 @@ resource "aws_apigatewayv2_route" "checkout" {
   api_id    = aws_apigatewayv2_api.http.id
   route_key = "POST /checkout"
   target    = "integrations/${aws_apigatewayv2_integration.checkout.id}"
-  # No auth — user passes their Supabase user_id in body, Paystack handles payment
+}
+
+resource "aws_apigatewayv2_route" "checkout_options" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "OPTIONS /checkout"
+  target    = "integrations/${aws_apigatewayv2_integration.checkout.id}"
 }
 
 resource "aws_apigatewayv2_route" "webhook_paystack" {
   api_id    = aws_apigatewayv2_api.http.id
   route_key = "POST /webhooks/paystack"
   target    = "integrations/${aws_apigatewayv2_integration.webhook.id}"
-  # No auth — protected by Paystack HMAC signature verification
 }
 
 # ── Output ────────────────────────────────────────────────────────────────

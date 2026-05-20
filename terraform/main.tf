@@ -128,6 +128,13 @@ resource "aws_lambda_function" "api" {
 resource "aws_apigatewayv2_api" "http" {
   name          = "${var.function_name}-api"
   protocol_type = "HTTP"
+
+  cors_configuration {
+    allow_headers = ["Content-Type", "Authorization", "X-API-Key"]
+    allow_methods = ["GET", "POST", "OPTIONS"]
+    allow_origins = ["*"]
+    max_age       = 300
+  }
 }
 
 resource "aws_apigatewayv2_integration" "lambda" {
