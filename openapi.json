@@ -1,0 +1,180 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Email Extractor API",
+    "description": "Scrapes one or more websites and returns the email addresses found on each.\n\n### Extraction strategy\nFor each URL the scraper tries, in order:\n1. Common contact-page paths (`/contact`, `/contact-us`, `/contacts`, \u2026)\n2. A navigation link whose text or `aria-label` contains *contact*, *reach out*, *get in touch*, etc.\n3. Emails found on the main page itself (fallback)\n\nBoth `mailto:` href attributes and plain-text regex matches are used. Results are lowercased, deduplicated, and sorted alphabetically.\n\n### Limits\n- Maximum **50 URLs** per request\n- Per-URL HTTP timeout: **10 seconds**\n- Lambda execution timeout: **60 seconds**\n\n### Error behaviour\nNetwork errors, DNS failures, and HTTP 4xx/5xx responses are handled gracefully \u2014 the offending URL is returned with an empty list rather than failing the whole request.",
+    "contact": {
+      "name": "SandileMP",
+      "url": "https://github.com/SandileMP/email-extractor-api"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    },
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/emails": {
+      "post": {
+        "tags": [
+          "Email extraction"
+        ],
+        "summary": "Extract emails from websites",
+        "description": "Submit a list of website URLs and receive the email addresses scraped from each.\n\nAll URLs are fetched concurrently. Unreachable or email-free sites return an\nempty list for that key \u2014 they do **not** cause the whole request to fail.",
+        "operationId": "get_emails_emails_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Emails extracted successfully (including URLs that returned empty lists).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailResponse"
+                },
+                "example": {
+                  "emails": {
+                    "https://marble.restaurant/": [
+                      "info@marble.restaurant"
+                    ],
+                    "https://www.aurumrestaurant.co.za/": [
+                      "bookings@aurumrestaurant.co.za"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error \u2014 empty list, invalid URL, or > 50 URLs."
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "Operations"
+        ],
+        "summary": "Health check",
+        "description": "Returns `{\"status\": \"ok\"}` when the service is running.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Service liveness status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                },
+                "example": {
+                  "status": "ok"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "EmailRequest": {
+        "properties": {
+          "urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Urls",
+            "description": "List of website URLs to scrape (1\u201350 entries, http/https only).",
+            "examples": [
+              [
+                "https://marble.restaurant/",
+                "https://www.aurumrestaurant.co.za/"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "urls"
+        ],
+        "title": "EmailRequest",
+        "examples": [
+          {
+            "urls": [
+              "https://marble.restaurant/",
+              "https://www.aurumrestaurant.co.za/"
+            ]
+          }
+        ]
+      },
+      "EmailResponse": {
+        "properties": {
+          "emails": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Emails",
+            "description": "Map of input URL \u2192 sorted list of unique email addresses found. An empty list means no emails were discovered (or the site was unreachable).",
+            "examples": [
+              {
+                "https://marble.restaurant/": [
+                  "info@marble.restaurant"
+                ],
+                "https://www.aurumrestaurant.co.za/": [
+                  "bookings@aurumrestaurant.co.za"
+                ]
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "emails"
+        ],
+        "title": "EmailResponse",
+        "examples": [
+          {
+            "emails": {
+              "https://marble.restaurant/": [
+                "info@marble.restaurant"
+              ],
+              "https://www.aurumrestaurant.co.za/": [
+                "bookings@aurumrestaurant.co.za"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Email extraction",
+      "description": "Scrape email addresses from websites."
+    },
+    {
+      "name": "Operations",
+      "description": "Health and liveness checks."
+    }
+  ]
+}
