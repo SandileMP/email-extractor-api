@@ -24,9 +24,9 @@ const client = new DynamoDBClient(clientConfig)
 export const db = DynamoDBDocumentClient.from(client)
 
 export const TABLES = {
-  users: process.env.USERS_TABLE || 'scrapify-users',
-  apiKeys: process.env.API_KEYS_TABLE || 'scrapify-api-keys',
-  subscriptions: process.env.SUBSCRIPTIONS_TABLE || 'scrapify-subscriptions',
+  users: process.env.USERS_TABLE || 'meshparse-users',
+  apiKeys: process.env.API_KEYS_TABLE || 'meshparse-api-keys',
+  subscriptions: process.env.SUBSCRIPTIONS_TABLE || 'meshparse-subscriptions',
 }
 
 export function generateApiKey() {

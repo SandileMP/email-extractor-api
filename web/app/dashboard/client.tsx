@@ -3,7 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
-const EXAMPLE = (key: string) => `curl -X POST https://api.scrapify.io/emails \\
+const EXAMPLE = (key: string) => `curl -X POST https://api.meshparse.com/emails \\
   -H "X-API-Key: ${key}" \\
   -H "Content-Type: application/json" \\
   -d '{"urls":["https://example.com"]}'`
@@ -52,7 +52,7 @@ export default function DashboardClient({ email, subscriptionStatus, apiKey }: P
       {/* Nav */}
       <nav className="border-b border-white/5 bg-zinc-950/80 backdrop-blur sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="font-bold text-lg text-brand">Scrapify</Link>
+          <Link href="/" className="font-bold text-lg text-brand">MeshParse</Link>
           <div className="flex items-center gap-4">
             <span className="text-sm text-zinc-500 hidden sm:block">{email}</span>
             <button onClick={logout} className="text-sm text-zinc-400 hover:text-white transition-colors">
@@ -76,7 +76,7 @@ export default function DashboardClient({ email, subscriptionStatus, apiKey }: P
           </div>
           <div className="p-6 bg-zinc-900 rounded-xl border border-white/5">
             <p className="text-sm text-zinc-400 mb-1">Plan</p>
-            <span className="font-semibold">{isActive ? 'Scrapify Pro' : '—'}</span>
+            <span className="font-semibold">{isActive ? 'MeshParse Pro' : '—'}</span>
           </div>
         </div>
 

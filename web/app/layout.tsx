@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Scrapify — Email Extraction API',
+  title: 'MeshParse — Email Extraction API',
   description: 'Extract email addresses from any website. Simple API, one flat price.',
 }
 

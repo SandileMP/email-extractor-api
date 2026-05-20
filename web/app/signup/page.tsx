@@ -32,7 +32,7 @@ export default function SignUp() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <Link href="/" className="block text-center text-xl font-bold text-brand mb-8">
-          Scrapify
+          MeshParse
         </Link>
         <div className="bg-zinc-900 border border-white/5 rounded-2xl p-8">
           <h1 className="text-xl font-bold mb-1">Create an account</h1>

@@ -12,7 +12,7 @@ data "archive_file" "authorizer" {
 # ── IAM ───────────────────────────────────────────────────────────────────
 
 resource "aws_iam_role" "authorizer" {
-  name = "scrapify-authorizer-role"
+  name = "meshparse-authorizer-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -30,7 +30,7 @@ resource "aws_iam_role_policy_attachment" "authorizer_logs" {
 }
 
 resource "aws_iam_role_policy" "authorizer_dynamodb" {
-  name = "scrapify-authorizer-dynamodb"
+  name = "meshparse-authorizer-dynamodb"
   role = aws_iam_role.authorizer.id
 
   policy = jsonencode({
@@ -46,7 +46,7 @@ resource "aws_iam_role_policy" "authorizer_dynamodb" {
 # ── Lambda ────────────────────────────────────────────────────────────────
 
 resource "aws_lambda_function" "authorizer" {
-  function_name    = "scrapify-api-authorizer"
+  function_name    = "meshparse-api-authorizer"
   role             = aws_iam_role.authorizer.arn
   handler          = "authorizer.handler"
   runtime          = "python3.12"

@@ -9,7 +9,7 @@ const features = [
   { icon: '📡', title: 'JSON API', desc: 'Simple REST endpoint. Integrate in minutes.' },
 ]
 
-const REQUEST = `curl -X POST https://api.scrapify.io/emails \\
+const REQUEST = `curl -X POST https://api.meshparse.com/emails \\
   -H "X-API-Key: sc_live_your_key_here" \\
   -H "Content-Type: application/json" \\
   -d '{"urls":["https://marble.restaurant/"]}'`
@@ -29,7 +29,7 @@ export default function Home() {
       <nav className="border-b border-white/5 backdrop-blur sticky top-0 z-50 bg-zinc-950/80">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <span className="font-bold text-lg tracking-tight">
-            <span className="text-brand">Scrapify</span>
+            <span className="text-brand">MeshParse</span>
           </span>
           <div className="flex gap-3">
             <Link href="/login" className="px-4 py-2 text-sm text-zinc-400 hover:text-white transition-colors">
@@ -105,7 +105,7 @@ export default function Home() {
         <div className="max-w-sm mx-auto">
           <div className="p-8 rounded-2xl bg-zinc-900 border border-brand/40 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-brand to-transparent" />
-            <div className="text-sm text-brand font-medium mb-2">Scrapify Pro</div>
+            <div className="text-sm text-brand font-medium mb-2">MeshParse Pro</div>
             <div className="flex items-baseline gap-1 mb-6">
               <span className="text-5xl font-bold">R750</span>
               <span className="text-zinc-400">/month</span>
@@ -138,8 +138,8 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-white/5 py-10">
         <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-500">
-          <span className="font-semibold text-white">Scrapify</span>
-          <span>© {new Date().getFullYear()} Scrapify. All rights reserved.</span>
+          <span className="font-semibold text-white">MeshParse</span>
+          <span>© {new Date().getFullYear()} MeshParse. All rights reserved.</span>
           <a
             href="https://ebfczvv0p2.execute-api.eu-west-1.amazonaws.com/docs"
             target="_blank"

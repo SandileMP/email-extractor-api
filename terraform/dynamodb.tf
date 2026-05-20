@@ -1,5 +1,5 @@
 resource "aws_dynamodb_table" "users" {
-  name         = "scrapify-users"
+  name         = "meshparse-users"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "email"
 
@@ -10,7 +10,7 @@ resource "aws_dynamodb_table" "users" {
 }
 
 resource "aws_dynamodb_table" "api_keys" {
-  name         = "scrapify-api-keys"
+  name         = "meshparse-api-keys"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "api_key"
 
@@ -32,7 +32,7 @@ resource "aws_dynamodb_table" "api_keys" {
 }
 
 resource "aws_dynamodb_table" "subscriptions" {
-  name         = "scrapify-subscriptions"
+  name         = "meshparse-subscriptions"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "subscription_code"
 

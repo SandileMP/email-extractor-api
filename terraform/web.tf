@@ -5,7 +5,7 @@ provider "aws" {
 }
 
 variable "domain_name" {
-  default = "scrapify.io"
+  default = "meshparse.com"
 }
 
 variable "github_token" {
@@ -30,7 +30,7 @@ data "aws_ssm_parameter" "jwt_secret" {
 # ── IAM user for web app → DynamoDB ──────────────────────────────────────
 
 resource "aws_iam_user" "web_app" {
-  name = "scrapify-web-app"
+  name = "meshparse-web-app"
 }
 
 resource "aws_iam_access_key" "web_app" {
@@ -38,7 +38,7 @@ resource "aws_iam_access_key" "web_app" {
 }
 
 resource "aws_iam_user_policy" "web_app_dynamodb" {
-  name = "scrapify-web-dynamodb"
+  name = "meshparse-web-dynamodb"
   user = aws_iam_user.web_app.name
 
   policy = jsonencode({
@@ -66,13 +66,13 @@ resource "aws_iam_user_policy" "web_app_dynamodb" {
 
 # ── Route 53 ─────────────────────────────────────────────────────────────
 
-resource "aws_route53_zone" "scrapify" {
+resource "aws_route53_zone" "meshparse" {
   name = var.domain_name
 }
 
 # ── ACM certificate (must be us-east-1 for Amplify) ──────────────────────
 
-resource "aws_acm_certificate" "scrapify" {
+resource "aws_acm_certificate" "meshparse" {
   provider                  = aws.us_east_1
   domain_name               = var.domain_name
   subject_alternative_names = ["*.${var.domain_name}"]
@@ -85,13 +85,13 @@ resource "aws_acm_certificate" "scrapify" {
 
 resource "aws_route53_record" "cert_validation" {
   for_each = {
-    for dvo in aws_acm_certificate.scrapify.domain_validation_options : dvo.domain_name => {
+    for dvo in aws_acm_certificate.meshparse.domain_validation_options : dvo.domain_name => {
       name   = dvo.resource_record_name
       type   = dvo.resource_record_type
       record = dvo.resource_record_value
     }
   }
-  zone_id         = aws_route53_zone.scrapify.zone_id
+  zone_id         = aws_route53_zone.meshparse.zone_id
   name            = each.value.name
   type            = each.value.type
   records         = [each.value.record]
@@ -100,13 +100,13 @@ resource "aws_route53_record" "cert_validation" {
 }
 
 # Note: aws_acm_certificate_validation is intentionally omitted.
-# The cert validates automatically once scrapify.io nameservers point to Route 53.
+# The cert validates automatically once DNS propagates (meshparse.com is registered via Route 53).
 # Check status: aws acm describe-certificate --certificate-arn <arn> --region us-east-1
 
 # ── Amplify app ───────────────────────────────────────────────────────────
 
-resource "aws_amplify_app" "scrapify" {
-  name         = "scrapify"
+resource "aws_amplify_app" "meshparse" {
+  name         = "meshparse"
   repository   = "https://github.com/SandileMP/email-extractor-api"
   access_token = var.github_token
   platform     = "WEB_COMPUTE"
@@ -149,15 +149,15 @@ resource "aws_amplify_app" "scrapify" {
 }
 
 resource "aws_amplify_branch" "main" {
-  app_id            = aws_amplify_app.scrapify.id
+  app_id            = aws_amplify_app.meshparse.id
   branch_name       = "main"
   enable_auto_build = true
   framework         = "Next.js - SSR"
   stage             = "PRODUCTION"
 }
 
-resource "aws_amplify_domain_association" "scrapify" {
-  app_id      = aws_amplify_app.scrapify.id
+resource "aws_amplify_domain_association" "meshparse" {
+  app_id      = aws_amplify_app.meshparse.id
   domain_name = var.domain_name
   wait_for_verification = false
 
@@ -175,16 +175,16 @@ resource "aws_amplify_domain_association" "scrapify" {
 # ── Outputs ───────────────────────────────────────────────────────────────
 
 output "amplify_app_id" {
-  value = aws_amplify_app.scrapify.id
+  value = aws_amplify_app.meshparse.id
 }
 
 output "amplify_default_domain" {
-  value = aws_amplify_app.scrapify.default_domain
+  value = aws_amplify_app.meshparse.default_domain
 }
 
 output "route53_nameservers" {
   description = "Point your domain registrar to these nameservers"
-  value       = aws_route53_zone.scrapify.name_servers
+  value       = aws_route53_zone.meshparse.name_servers
 }
 
 output "web_app_access_key_id" {
