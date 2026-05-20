@@ -1,24 +1,23 @@
 import { redirect } from 'next/navigation'
-import { getSession } from '@/lib/auth'
-import { getUser, getApiKeyForUser } from '@/lib/dynamodb'
+import { createClient } from '@/utils/supabase/server'
 import DashboardClient from './client'
 
 export default async function Dashboard() {
-  const session = await getSession()
-  if (!session) redirect('/login')
+  const supabase = await createClient()
 
-  const [user, keyRecord] = await Promise.all([
-    getUser(session.email),
-    getApiKeyForUser(session.email),
-  ])
-
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const [{ data: keyRow }, { data: sub }] = await Promise.all([
+    supabase.from('api_keys').select('api_key').eq('user_id', user.id).eq('active', true).maybeSingle(),
+    supabase.from('subscriptions').select('status').eq('user_id', user.id).maybeSingle(),
+  ])
 
   return (
     <DashboardClient
-      email={user.email}
-      subscriptionStatus={user.subscription_status}
-      apiKey={keyRecord?.api_key ?? null}
+      email={user.email ?? ''}
+      subscriptionStatus={sub?.status ?? 'inactive'}
+      apiKey={keyRow?.api_key ?? null}
     />
   )
 }

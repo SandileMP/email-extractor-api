@@ -1,29 +1,21 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
-import { jwtVerify } from 'jose'
-
-const JWT_SECRET = () => new TextEncoder().encode(process.env.JWT_SECRET!)
+import { type NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/utils/supabase/middleware'
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  const { supabase, response } = createClient(request)
 
-  if (pathname.startsWith('/dashboard')) {
-    const token = request.cookies.get('auth-token')?.value
-    if (!token) {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-    try {
-      await jwtVerify(token, JWT_SECRET())
-    } catch {
-      const res = NextResponse.redirect(new URL('/login', request.url))
-      res.cookies.delete('auth-token')
-      return res
-    }
+  // Refresh session — must be called before any redirects
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  return NextResponse.next()
+  return response
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 }

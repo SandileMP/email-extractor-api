@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { COOKIE } from '@/lib/auth'
+import { createClient } from '@/utils/supabase/server'
 
 export async function POST() {
-  const res = NextResponse.json({ ok: true })
-  res.cookies.set({ ...COOKIE, value: '', maxAge: 0 })
-  return res
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+  return NextResponse.json({ ok: true })
 }

@@ -1,21 +1,31 @@
 import { NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth'
-import { getUser, getApiKeyForUser } from '@/lib/dynamodb'
+import { createClient } from '@/utils/supabase/server'
 
 export async function GET() {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const supabase = await createClient()
 
-  const [user, keyRecord] = await Promise.all([
-    getUser(session.email),
-    getApiKeyForUser(session.email),
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const [{ data: keyRow }, { data: sub }] = await Promise.all([
+    supabase
+      .from('api_keys')
+      .select('api_key')
+      .eq('user_id', user.id)
+      .eq('active', true)
+      .maybeSingle(),
+    supabase
+      .from('subscriptions')
+      .select('status')
+      .eq('user_id', user.id)
+      .maybeSingle(),
   ])
-
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   return NextResponse.json({
     email: user.email,
-    subscription_status: user.subscription_status,
-    api_key: keyRecord?.api_key ?? null,
+    subscription_status: sub?.status ?? 'inactive',
+    api_key: keyRow?.api_key ?? null,
   })
 }
