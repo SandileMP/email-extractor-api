@@ -6,11 +6,12 @@ Returns: {"url": "<paystack-checkout-url>"}
 """
 import json
 import os
+import urllib.error
 import urllib.request
 
-PAYSTACK_SECRET = os.environ["PAYSTACK_SECRET_KEY"]
-PLAN_CODE       = os.environ["PAYSTACK_PLAN_CODE"]
-APP_URL         = os.environ["APP_URL"]
+PAYSTACK_SECRET = os.environ["PAYSTACK_SECRET_KEY"].strip()
+PLAN_CODE       = os.environ["PAYSTACK_PLAN_CODE"].strip()
+APP_URL         = os.environ["APP_URL"].strip()
 
 CORS = {
     "Access-Control-Allow-Origin":  "*",
@@ -46,13 +47,19 @@ def handler(event, context):
         req = urllib.request.Request(
             "https://api.paystack.co/transaction/initialize",
             data=payload,
-            headers={
-                "Authorization": f"Bearer {PAYSTACK_SECRET}",
-                "Content-Type":  "application/json",
-            },
+            method="POST",
         )
-        with urllib.request.urlopen(req) as resp:
-            result = json.loads(resp.read())
+        req.add_header("Authorization", f"Bearer {PAYSTACK_SECRET}")
+        req.add_header("Content-Type", "application/json")
+        req.add_header("User-Agent", "Mozilla/5.0 (compatible; MeshParse/1.0)")
+        req.add_header("Accept", "application/json")
+        try:
+            with urllib.request.urlopen(req) as resp:
+                result = json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            body = e.read().decode()
+            print(f"Paystack HTTP {e.code}: {body}")
+            return _err(502, f"Paystack error {e.code}")
 
         if not result.get("status"):
             return _err(502, result.get("message", "Paystack error"))

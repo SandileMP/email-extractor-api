@@ -8,13 +8,14 @@ import hmac
 import json
 import os
 import uuid
-import urllib.request
+import urllib.error
 import urllib.parse
+import urllib.request
 import boto3
 
-PAYSTACK_SECRET      = os.environ["PAYSTACK_SECRET_KEY"].encode()
-SUPABASE_URL         = os.environ["SUPABASE_URL"]
-SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+PAYSTACK_SECRET      = os.environ["PAYSTACK_SECRET_KEY"].strip().encode()
+SUPABASE_URL         = os.environ["SUPABASE_URL"].strip()
+SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"].strip()
 API_KEYS_TABLE       = os.environ.get("API_KEYS_TABLE", "meshparse-api-keys")
 REGION               = os.environ.get("APP_AWS_REGION", "eu-west-1")
 
@@ -26,25 +27,39 @@ CORS = {"Content-Type": "application/json"}
 
 # ── Supabase helpers ─────────────────────────────────────────────────────────
 
-def _sb(method, path, body=None):
-    url = f"{SUPABASE_URL}{path}"
+def _sb_req(method, url, body=None):
     data = json.dumps(body).encode() if body else None
     req = urllib.request.Request(url, data=data, method=method)
     req.add_header("apikey", SUPABASE_SERVICE_KEY)
     req.add_header("Authorization", f"Bearer {SUPABASE_SERVICE_KEY}")
     req.add_header("Content-Type", "application/json")
     req.add_header("Prefer", "return=minimal")
-    with urllib.request.urlopen(req) as resp:
-        return resp.read()
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return resp.read()
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        print(f"Supabase {method} {url} → {e.code}: {body}")
+        raise
+
+
+def _sb(method, path, body=None):
+    return _sb_req(method, f"{SUPABASE_URL}{path}", body)
 
 
 def _sb_get(path):
     url = f"{SUPABASE_URL}{path}"
-    req = urllib.request.Request(url)
+    req = urllib.request.Request(url, method="GET")
     req.add_header("apikey", SUPABASE_SERVICE_KEY)
     req.add_header("Authorization", f"Bearer {SUPABASE_SERVICE_KEY}")
-    with urllib.request.urlopen(req) as resp:
-        return json.loads(resp.read())
+    req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        print(f"Supabase GET {url} → {e.code}: {body}")
+        raise
 
 
 def get_existing_key(user_id):
