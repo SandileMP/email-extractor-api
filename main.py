@@ -3,8 +3,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
 
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
 from mangum import Mangum
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from scraper import extract_emails
 
@@ -13,8 +14,42 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Email Extractor API",
-    description="Extract email addresses from a list of website URLs.",
+    description=(
+        "Scrapes one or more websites and returns the email addresses found on each.\n\n"
+        "### Extraction strategy\n"
+        "For each URL the scraper tries, in order:\n"
+        "1. Common contact-page paths (`/contact`, `/contact-us`, `/contacts`, …)\n"
+        "2. A navigation link whose text or `aria-label` contains *contact*, *reach out*, *get in touch*, etc.\n"
+        "3. Emails found on the main page itself (fallback)\n\n"
+        "Both `mailto:` href attributes and plain-text regex matches are used. "
+        "Results are lowercased, deduplicated, and sorted alphabetically.\n\n"
+        "### Limits\n"
+        "- Maximum **50 URLs** per request\n"
+        "- Per-URL HTTP timeout: **10 seconds**\n"
+        "- Lambda execution timeout: **60 seconds**\n\n"
+        "### Error behaviour\n"
+        "Network errors, DNS failures, and HTTP 4xx/5xx responses are handled gracefully — "
+        "the offending URL is returned with an empty list rather than failing the whole request."
+    ),
     version="1.0.0",
+    contact={
+        "name": "SandileMP",
+        "url": "https://github.com/SandileMP/email-extractor-api",
+    },
+    license_info={
+        "name": "MIT",
+        "url": "https://opensource.org/licenses/MIT",
+    },
+    openapi_tags=[
+        {
+            "name": "Email extraction",
+            "description": "Scrape email addresses from websites.",
+        },
+        {
+            "name": "Operations",
+            "description": "Health and liveness checks.",
+        },
+    ],
 )
 
 MAX_URLS = 50
@@ -22,8 +57,12 @@ MAX_WORKERS = 10
 
 
 class EmailRequest(BaseModel):
-    # Use plain str so the original URL is preserved as the response key.
-    urls: list[str]
+    urls: list[str] = Field(
+        ...,
+        min_length=1,
+        description="List of website URLs to scrape (1–50 entries, http/https only).",
+        examples=[["https://marble.restaurant/", "https://www.aurumrestaurant.co.za/"]],
+    )
 
     @field_validator("urls")
     @classmethod
@@ -38,18 +77,82 @@ class EmailRequest(BaseModel):
                 raise ValueError(f"Invalid URL: {url!r}")
         return v
 
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "urls": [
+                        "https://marble.restaurant/",
+                        "https://www.aurumrestaurant.co.za/",
+                    ]
+                }
+            ]
+        }
+    }
+
 
 class EmailResponse(BaseModel):
-    emails: dict[str, list[str]]
+    emails: dict[str, list[str]] = Field(
+        ...,
+        description=(
+            "Map of input URL → sorted list of unique email addresses found. "
+            "An empty list means no emails were discovered (or the site was unreachable)."
+        ),
+        examples=[
+            {
+                "https://marble.restaurant/": ["info@marble.restaurant"],
+                "https://www.aurumrestaurant.co.za/": ["bookings@aurumrestaurant.co.za"],
+            }
+        ],
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "emails": {
+                        "https://marble.restaurant/": ["info@marble.restaurant"],
+                        "https://www.aurumrestaurant.co.za/": [
+                            "bookings@aurumrestaurant.co.za"
+                        ],
+                    }
+                }
+            ]
+        }
+    }
 
 
-@app.post("/emails", response_model=EmailResponse)
+@app.post(
+    "/emails",
+    response_model=EmailResponse,
+    tags=["Email extraction"],
+    summary="Extract emails from websites",
+    response_description="Email addresses grouped by input URL.",
+    responses={
+        200: {
+            "description": "Emails extracted successfully (including URLs that returned empty lists).",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "emails": {
+                            "https://marble.restaurant/": ["info@marble.restaurant"],
+                            "https://www.aurumrestaurant.co.za/": [
+                                "bookings@aurumrestaurant.co.za"
+                            ],
+                        }
+                    }
+                }
+            },
+        },
+        422: {"description": "Validation error — empty list, invalid URL, or > 50 URLs."},
+    },
+)
 def get_emails(payload: EmailRequest) -> EmailResponse:
     """
-    POST /emails
+    Submit a list of website URLs and receive the email addresses scraped from each.
 
-    Body: {"urls": ["https://example.com", ...]}
-    Returns a mapping of each URL to the email addresses found on that site.
+    All URLs are fetched concurrently. Unreachable or email-free sites return an
+    empty list for that key — they do **not** cause the whole request to fail.
     """
     url_strings = [str(u) for u in payload.urls]
     results: dict[str, list[str]] = {}
@@ -67,8 +170,15 @@ def get_emails(payload: EmailRequest) -> EmailResponse:
     return EmailResponse(emails=results)
 
 
-@app.get("/health")
+@app.get(
+    "/health",
+    tags=["Operations"],
+    summary="Health check",
+    response_description="Service liveness status.",
+    responses={200: {"content": {"application/json": {"example": {"status": "ok"}}}}},
+)
 def health() -> dict[str, str]:
+    """Returns `{"status": "ok"}` when the service is running."""
     return {"status": "ok"}
 
 
