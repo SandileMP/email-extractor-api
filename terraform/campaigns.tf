@@ -423,6 +423,20 @@ resource "aws_apigatewayv2_route" "campaign_logs_route" {
   authorization_type = "CUSTOM"
 }
 
+resource "aws_apigatewayv2_route" "extraction_get" {
+  api_id             = aws_apigatewayv2_api.http.id
+  route_key          = "GET /extractions/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.campaign.id}"
+  authorizer_id      = aws_apigatewayv2_authorizer.api_key.id
+  authorization_type = "CUSTOM"
+}
+
+resource "aws_apigatewayv2_route" "extraction_id_options" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "OPTIONS /extractions/{id}"
+  target    = "integrations/${aws_apigatewayv2_integration.campaign.id}"
+}
+
 resource "aws_apigatewayv2_route" "extractions_get" {
   api_id             = aws_apigatewayv2_api.http.id
   route_key          = "GET /extractions"

@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
@@ -156,8 +156,24 @@ export default function Dashboard() {
   const [creatingCampaign, setCreatingCampaign] = useState(false)
   const [sendingCampaign, setSendingCampaign] = useState<string | null>(null)
 
+  // Extraction tab state
+  const [extractMode, setExtractMode] = useState<'paste' | 'upload' | 'manual'>('paste')
+  const [extractPasted, setExtractPasted] = useState('')
+  const [extractManualInput, setExtractManualInput] = useState('')
+  const [extractManualList, setExtractManualList] = useState<string[]>([])
+  const [extractUploadUrls, setExtractUploadUrls] = useState<string[]>([])
+  const [extractUploadFileName, setExtractUploadFileName] = useState('')
+  const [extractUploadError, setExtractUploadError] = useState('')
+  const [extracting, setExtracting] = useState(false)
+  const [extractResults, setExtractResults] = useState<Record<string, string[]> | null>(null)
+  const [extractError, setExtractError] = useState('')
+  const [extractCopied, setExtractCopied] = useState(false)
+  const [extractHistoryLoading, setExtractHistoryLoading] = useState(false)
+  const [extractHistory, setExtractHistory] = useState<Extraction[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   // SEO scanner state
-  const [tab, setTab] = useState<'overview' | 'seo' | 'campaigns'>('overview')
+  const [tab, setTab] = useState<'overview' | 'seo' | 'extraction' | 'campaigns'>('overview')
   const [seoUrl, setSeoUrl] = useState('')
   const [depth, setDepth] = useState(1)
   const [maxPages, setMaxPages] = useState(5)
@@ -173,6 +189,15 @@ export default function Dashboard() {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 4000)
   }
+
+  const loadExtractHistory = useCallback(async (key: string) => {
+    setExtractHistoryLoading(true)
+    try {
+      const res = await fetch(`${API}/extractions`, { headers: { 'X-API-Key': key } })
+      if (res.ok) setExtractHistory((await res.json()).extractions || [])
+    } catch { /* silent */ }
+    setExtractHistoryLoading(false)
+  }, [])
 
   const loadCampaignsData = useCallback(async (key: string) => {
     setCampaignsLoading(true)
@@ -293,6 +318,48 @@ export default function Dashboard() {
   const isActive = subStatus === 'active'
   const maskedKey = apiKey ? `${apiKey.slice(0, 14)}${'•'.repeat(20)}` : null
 
+  async function parseFile(file: File) {
+    setExtractUploadError('')
+    setExtractUploadUrls([])
+    setExtractUploadFileName(file.name)
+    try {
+      const { read, utils } = await import('xlsx')
+      const buf  = await file.arrayBuffer()
+      const wb   = read(buf, { type: 'array' })
+      const ws   = wb.Sheets[wb.SheetNames[0]]
+      const rows = utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
+
+      if (rows.length === 0) { setExtractUploadError('File is empty or unreadable'); return }
+
+      // Auto-detect URL columns: values starting with http or www, or containing a dot
+      const urlPattern = /^(https?:\/\/|www\.)[^\s]+$/i
+      const allCols    = Object.keys(rows[0])
+      const urlCols    = allCols.filter(col =>
+        rows.slice(0, 10).some(r => urlPattern.test(String(r[col] || '').trim()))
+      )
+
+      if (urlCols.length === 0) {
+        setExtractUploadError('No URL column detected. Make sure at least one column contains URLs starting with http:// or www.')
+        return
+      }
+
+      const urls: string[] = []
+      rows.forEach(row => {
+        urlCols.forEach(col => {
+          const raw = String(row[col] || '').trim()
+          if (!raw) return
+          const url = raw.startsWith('http') ? raw : `https://${raw}`
+          if (!urls.includes(url) && urls.length < 50) urls.push(url)
+        })
+      })
+
+      if (urls.length === 0) { setExtractUploadError('No valid URLs found in file'); return }
+      setExtractUploadUrls(urls)
+    } catch (e) {
+      setExtractUploadError(`Could not parse file: ${e instanceof Error ? e.message : 'unknown error'}`)
+    }
+  }
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: '#07080f' }}>
       <div className="w-8 h-8 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
@@ -337,13 +404,15 @@ export default function Dashboard() {
         {/* Tab bar */}
         <div className="flex gap-1 p-1 rounded-xl mb-8 w-fit" style={{ background: '#0d0f1a' }}>
           {[
-            { id: 'overview', label: 'Overview' },
-            { id: 'seo', label: 'SEO Scanner' },
-            { id: 'campaigns', label: 'Campaigns' },
+            { id: 'overview',   label: 'Overview' },
+            { id: 'extraction', label: 'Email Extraction' },
+            { id: 'seo',        label: 'SEO Scanner' },
+            { id: 'campaigns',  label: 'Campaigns' },
           ].map(t => (
             <button key={t.id} onClick={() => {
               setTab(t.id as typeof tab)
               if (t.id === 'campaigns' && apiKey) loadCampaignsData(apiKey)
+              if (t.id === 'extraction' && apiKey) loadExtractHistory(apiKey)
             }}
               className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
                 tab === t.id ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-zinc-300'
@@ -467,6 +536,406 @@ export default function Dashboard() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── EXTRACTION TAB ──────────────────────────────────────────── */}
+        {tab === 'extraction' && (
+          <div className="space-y-6">
+            {!isActive && (
+              <div className="rounded-xl border border-emerald-500/20 p-6 flex items-center gap-4"
+                style={{ background: 'linear-gradient(135deg,#0d1a12,#0a0f1e)' }}>
+                <span className="text-3xl">✉️</span>
+                <div className="flex-1">
+                  <p className="font-semibold mb-1">Email Extraction requires an active subscription</p>
+                  <p className="text-sm text-zinc-400">Subscribe to scrape email addresses from any website.</p>
+                </div>
+                <button onClick={subscribe} disabled={checkingOut}
+                  className="flex-shrink-0 px-5 py-2 font-bold text-black rounded-lg text-sm"
+                  style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)' }}>
+                  Subscribe →
+                </button>
+              </div>
+            )}
+
+            {/* Input card */}
+            <div className="rounded-xl border border-white/5" style={{ background: '#0d0f1a' }}>
+              <div className="px-6 py-4 border-b border-white/5">
+                <h2 className="font-semibold">Extract Emails</h2>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Enter website URLs — we'll scrape each one and return every email address found
+                </p>
+              </div>
+
+              {/* Mode tabs */}
+              <div className="px-6 pt-5">
+                <div className="flex gap-1 p-1 rounded-lg w-fit mb-5" style={{ background: '#0a0c14', border: '1px solid #ffffff08' }}>
+                  {[
+                    { id: 'paste',  label: 'Paste URLs' },
+                    { id: 'upload', label: 'Upload file' },
+                    { id: 'manual', label: 'Manual entry' },
+                  ].map(m => (
+                    <button key={m.id} onClick={() => setExtractMode(m.id as typeof extractMode)}
+                      className={`px-4 py-2 rounded text-xs font-semibold transition-all ${
+                        extractMode === m.id ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                      }`}>{m.label}</button>
+                  ))}
+                </div>
+
+                {/* ── Paste mode ── */}
+                {extractMode === 'paste' && (
+                  <div className="space-y-3 pb-5">
+                    <p className="text-xs text-zinc-600">One URL per line, or comma/space separated. Max 50.</p>
+                    <textarea
+                      value={extractPasted}
+                      onChange={e => setExtractPasted(e.target.value)}
+                      rows={6}
+                      placeholder={"https://marble.restaurant/\nhttps://aurumrestaurant.co.za/\nhttps://example.com/"}
+                      className="w-full px-4 py-3 rounded-xl text-sm outline-none font-mono resize-y leading-relaxed"
+                      style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}
+                    />
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-zinc-600">
+                        {extractPasted.split(/[\n,\s]+/).filter(u => u.trim().startsWith('http')).length} URLs detected
+                      </span>
+                      <button onClick={() => setExtractPasted('')}
+                        className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">Clear</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Upload mode ── */}
+                {extractMode === 'upload' && (
+                  <div className="pb-5 space-y-3">
+                    <p className="text-xs text-zinc-600">
+                      Excel (.xlsx) or CSV — any column containing URLs is auto-detected.
+                    </p>
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      onDragOver={e => e.preventDefault()}
+                      onDrop={async e => {
+                        e.preventDefault()
+                        const file = e.dataTransfer.files[0]
+                        if (file) await parseFile(file)
+                      }}
+                      className="border-2 border-dashed border-white/10 rounded-xl p-10 text-center cursor-pointer hover:border-white/20 transition-colors">
+                      <div className="text-3xl mb-3">📂</div>
+                      <p className="text-sm font-semibold text-zinc-300 mb-1">
+                        {extractUploadFileName || 'Drop your file here or click to browse'}
+                      </p>
+                      <p className="text-xs text-zinc-600">Supports .xlsx, .xls, .csv</p>
+                      <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
+                        onChange={async e => { if (e.target.files?.[0]) await parseFile(e.target.files[0]) }}/>
+                    </div>
+                    {extractUploadError && (
+                      <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                        {extractUploadError}
+                      </p>
+                    )}
+                    {extractUploadUrls.length > 0 && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-zinc-400">
+                            {extractUploadUrls.length} URLs detected
+                          </span>
+                          <button onClick={() => { setExtractUploadUrls([]); setExtractUploadFileName('') }}
+                            className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">Clear</button>
+                        </div>
+                        <div className="rounded-lg border border-white/5 max-h-40 overflow-y-auto divide-y divide-white/5"
+                          style={{ background: '#0a0c14' }}>
+                          {extractUploadUrls.map((u, i) => (
+                            <div key={i} className="flex items-center justify-between px-3 py-2">
+                              <span className="text-xs text-zinc-300 font-mono truncate">{u}</span>
+                              <button onClick={() => setExtractUploadUrls(v => v.filter((_, j) => j !== i))}
+                                className="ml-2 text-zinc-600 hover:text-red-400 transition-colors text-xs flex-shrink-0">✕</button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Manual mode ── */}
+                {extractMode === 'manual' && (
+                  <div className="pb-5 space-y-3">
+                    <p className="text-xs text-zinc-600">Add URLs one at a time to build your list.</p>
+                    <div className="flex gap-2">
+                      <input
+                        value={extractManualInput}
+                        onChange={e => setExtractManualInput(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            const url = extractManualInput.trim()
+                            if (url && (url.startsWith('http://') || url.startsWith('https://')) && !extractManualList.includes(url)) {
+                              setExtractManualList(v => [...v, url])
+                              setExtractManualInput('')
+                            }
+                          }
+                        }}
+                        placeholder="https://example.com"
+                        className="flex-1 px-4 py-2.5 rounded-xl text-sm outline-none"
+                        style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}
+                      />
+                      <button
+                        onClick={() => {
+                          const url = extractManualInput.trim()
+                          if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) return
+                          if (extractManualList.includes(url)) return
+                          setExtractManualList(v => [...v, url])
+                          setExtractManualInput('')
+                        }}
+                        className="px-4 py-2.5 rounded-xl text-sm font-bold border border-white/10 hover:bg-white/5 transition-colors text-zinc-300">
+                        + Add
+                      </button>
+                    </div>
+
+                    {extractManualList.length > 0 ? (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-zinc-400">{extractManualList.length} / 50 URLs</span>
+                          <button onClick={() => setExtractManualList([])}
+                            className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">Clear all</button>
+                        </div>
+                        <div className="rounded-lg border border-white/5 divide-y divide-white/5"
+                          style={{ background: '#0a0c14' }}>
+                          {extractManualList.map((u, i) => (
+                            <div key={i} className="flex items-center justify-between px-3 py-2.5 group">
+                              <span className="text-xs text-zinc-300 font-mono truncate">{u}</span>
+                              <button onClick={() => setExtractManualList(v => v.filter((_, j) => j !== i))}
+                                className="ml-2 text-zinc-700 group-hover:text-red-400 transition-colors text-xs flex-shrink-0">✕</button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-zinc-700 text-center py-6 border border-dashed border-white/5 rounded-xl">
+                        No URLs added yet — type one above and press Enter
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Extract button */}
+              <div className="px-6 pb-6">
+                {extractError && (
+                  <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 mb-4">
+                    {extractError}
+                  </p>
+                )}
+                <button
+                  disabled={extracting || !isActive || !apiKey || (() => {
+                    if (extractMode === 'paste') return extractPasted.split(/[\n,\s]+/).filter(u => u.trim().startsWith('http')).length === 0
+                    if (extractMode === 'upload') return extractUploadUrls.length === 0
+                    if (extractMode === 'manual') return extractManualList.length === 0
+                    return true
+                  })()}
+                  onClick={async () => {
+                    if (!apiKey) return
+                    setExtractError('')
+                    setExtractResults(null)
+                    setExtracting(true)
+
+                    let urls: string[] = []
+                    if (extractMode === 'paste') {
+                      urls = extractPasted.split(/[\n,\s]+/).map(u => u.trim()).filter(u => u.startsWith('http'))
+                    } else if (extractMode === 'upload') {
+                      urls = extractUploadUrls
+                    } else if (extractMode === 'manual') {
+                      urls = extractManualList
+                    }
+                    urls = [...new Set(urls)].slice(0, 50)
+
+                    try {
+                      const res = await fetch(`${API}/emails`, {
+                        method: 'POST',
+                        headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ urls }),
+                      })
+                      const data = await res.json()
+                      if (!res.ok || data.error) {
+                        setExtractError(data.error || `HTTP ${res.status}`)
+                      } else {
+                        setExtractResults(data.emails)
+                        loadExtractHistory(apiKey)
+                      }
+                    } catch { setExtractError('Request failed — check your network and try again') }
+                    setExtracting(false)
+                  }}
+                  className="w-full py-3.5 font-bold text-sm rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                  style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)', color: '#000' }}>
+                  {extracting
+                    ? <><span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"/>
+                        Scraping websites…</>
+                    : '→ Extract Emails'}
+                </button>
+              </div>
+            </div>
+
+            {/* Results */}
+            {extractResults && (() => {
+              const allEmails = [...new Set(Object.values(extractResults).flat())].sort()
+              const totalUrls  = Object.keys(extractResults).length
+              const hitUrls    = Object.values(extractResults).filter(e => e.length > 0).length
+
+              const exportCsv = () => {
+                const rows = ['url,email']
+                Object.entries(extractResults).forEach(([url, emails]) => {
+                  if (emails.length === 0) rows.push(`${url},`)
+                  else emails.forEach(e => rows.push(`${url},${e}`))
+                })
+                const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
+                const a = document.createElement('a')
+                a.href = URL.createObjectURL(blob)
+                a.download = `extraction-${new Date().toISOString().slice(0,10)}.csv`
+                a.click()
+              }
+
+              return (
+                <div className="space-y-4">
+                  {/* Summary + actions */}
+                  <div className="rounded-xl border border-white/5 p-5" style={{ background: '#0d0f1a' }}>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
+                        <p className="font-bold text-lg">
+                          <span className="text-emerald-400">{allEmails.length}</span>
+                          <span className="text-zinc-400 font-normal text-sm ml-2">unique emails found</span>
+                        </p>
+                        <p className="text-xs text-zinc-600 mt-0.5">
+                          {hitUrls} of {totalUrls} sites returned results
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          disabled={allEmails.length === 0}
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(allEmails.join('\n'))
+                            setExtractCopied(true); setTimeout(() => setExtractCopied(false), 2000)
+                          }}
+                          className="text-xs px-3 py-2 rounded-lg border border-white/10 hover:bg-white/5 transition-colors text-zinc-300 font-semibold disabled:opacity-40">
+                          {extractCopied ? '✓ Copied!' : '📋 Copy all emails'}
+                        </button>
+                        <button
+                          disabled={allEmails.length === 0}
+                          onClick={exportCsv}
+                          className="text-xs px-3 py-2 rounded-lg border border-white/10 hover:bg-white/5 transition-colors text-zinc-300 font-semibold disabled:opacity-40">
+                          ⬇ Export CSV
+                        </button>
+                        <button
+                          disabled={allEmails.length === 0}
+                          onClick={() => {
+                            setTab('campaigns')
+                            if (apiKey) loadCampaignsData(apiKey)
+                            setTimeout(() => {
+                              if (mailAccounts.length === 0) { showToast('Add a mail account first', 'error'); return }
+                              setEditingCampaignId(null)
+                              setCampName(''); setCampAccount(''); setCampSubject(''); setCampHtml(''); setCampText('')
+                              setCampEmailsPasted(allEmails.join('\n'))
+                              setCampRecipientMode('paste')
+                              setShowCampaignForm(true)
+                            }, 100)
+                          }}
+                          className="text-xs px-3 py-2 rounded-lg font-bold disabled:opacity-40 transition-all"
+                          style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)', color: '#000' }}>
+                          → Create campaign
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Per-URL results */}
+                  <div className="space-y-2">
+                    {Object.entries(extractResults)
+                      .sort(([, a], [, b]) => b.length - a.length)
+                      .map(([url, emails]) => (
+                        <div key={url} className="rounded-xl border border-white/5 overflow-hidden"
+                          style={{ background: '#0d0f1a' }}>
+                          <div className="flex items-center justify-between px-5 py-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${emails.length > 0 ? 'bg-emerald-400' : 'bg-zinc-700'}`}/>
+                              <span className="text-sm text-zinc-300 truncate font-mono">{url}</span>
+                            </div>
+                            <span className={`flex-shrink-0 ml-3 text-xs font-bold px-2 py-0.5 rounded-full border ${
+                              emails.length > 0
+                                ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
+                                : 'border-zinc-700 text-zinc-600 bg-zinc-800/50'
+                            }`}>
+                              {emails.length} {emails.length === 1 ? 'email' : 'emails'}
+                            </span>
+                          </div>
+                          {emails.length > 0 && (
+                            <div className="px-5 pb-4 flex flex-wrap gap-2">
+                              {emails.map(e => (
+                                <span key={e}
+                                  onClick={async () => { await navigator.clipboard.writeText(e); showToast(`Copied ${e}`) }}
+                                  className="text-xs px-2.5 py-1 rounded-full font-mono cursor-pointer transition-colors hover:bg-emerald-500/10 border border-white/5 hover:border-emerald-500/20 text-zinc-300 hover:text-emerald-300">
+                                  {e}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Extraction history */}
+            <div className="rounded-xl border border-white/5" style={{ background: '#0d0f1a' }}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+                <h3 className="font-semibold text-sm">Extraction history</h3>
+                {apiKey && (
+                  <button onClick={() => loadExtractHistory(apiKey)}
+                    className="text-xs text-zinc-500 hover:text-white transition-colors">Refresh</button>
+                )}
+              </div>
+              {extractHistoryLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"/>
+                </div>
+              ) : extractHistory.length === 0 ? (
+                <p className="text-sm text-zinc-600 text-center py-8">No extractions yet — run your first extraction above</p>
+              ) : (
+                <div className="divide-y divide-white/5">
+                  {extractHistory.map(ex => (
+                    <div key={ex.extraction_id}
+                      className="flex items-center justify-between px-6 py-3 hover:bg-white/[0.02] transition-colors cursor-pointer group"
+                      onClick={async () => {
+                        if (!apiKey) return
+                        setExtracting(true)
+                        try {
+                          const res = await fetch(`${API}/extractions/${ex.extraction_id}`, {
+                            headers: { 'X-API-Key': apiKey },
+                          })
+                          if (res.ok) {
+                            const data = await res.json()
+                            setExtractResults(data.emails || {})
+                            window.scrollTo({ top: 0, behavior: 'smooth' })
+                          } else {
+                            setExtractResults(
+                              Object.fromEntries(ex.urls.map(u => [u, []]))
+                            )
+                          }
+                        } catch { /* silent */ }
+                        setExtracting(false)
+                      }}>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-zinc-300 truncate">
+                          {ex.urls.slice(0,2).join(', ')}{ex.urls.length > 2 ? ` +${ex.urls.length - 2} more` : ''}
+                        </p>
+                        <p className="text-xs text-zinc-600 mt-0.5">{new Date(ex.created_at).toLocaleString()}</p>
+                      </div>
+                      <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+                        <span className="text-xs font-bold text-emerald-500">{ex.email_count} emails</span>
+                        <span className="text-zinc-700 group-hover:text-zinc-400 transition-colors text-xs">→</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

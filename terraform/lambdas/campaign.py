@@ -66,6 +66,10 @@ def handler(event, context):
         return _ok({})
 
     try:
+        if method == "GET" and re.match(r".*/extractions/[^/]+$", path):
+            extraction_id = path.split("/")[-1]
+            return _get_extraction(extraction_id, user_id)
+
         if method == "GET" and path.endswith("/extractions"):
             return _list_extractions(user_id, qs)
 
@@ -350,6 +354,13 @@ def _campaign_logs(campaign_id, user_id, qs):
 
 
 # ── Extractions list ──────────────────────────────────────────────────────
+
+def _get_extraction(extraction_id, user_id):
+    item = extractions_t.get_item(Key={"extraction_id": extraction_id}).get("Item")
+    if not item or item.get("user_id") != user_id:
+        return _err(404, "Extraction not found")
+    return _ok(_from_dynamo(item))
+
 
 def _list_extractions(user_id, qs):
     limit = min(int(qs.get("limit", 20)), 100)
