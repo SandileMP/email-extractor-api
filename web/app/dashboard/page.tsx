@@ -38,10 +38,13 @@ export default function Dashboard() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
       setUser(session.user)
-      const [{ data: keyRow }, { data: sub }] = await Promise.all([
-        supabase.from('api_keys').select('api_key').eq('user_id', session.user.id).eq('active', true).maybeSingle(),
-        supabase.from('subscriptions').select('status').eq('user_id', session.user.id).maybeSingle(),
+      // Use limit(1) + index 0 instead of maybeSingle() so multiple rows never cause null
+      const [{ data: keys }, { data: subs }] = await Promise.all([
+        supabase.from('api_keys').select('api_key').eq('user_id', session.user.id).eq('active', true).order('created_at', { ascending: false }).limit(1),
+        supabase.from('subscriptions').select('status').eq('user_id', session.user.id).order('updated_at', { ascending: false }).limit(1),
       ])
+      const keyRow = keys?.[0]
+      const sub    = subs?.[0]
       setApiKey(keyRow?.api_key ?? null)
       setSubStatus(sub?.status ?? 'inactive')
       setLoading(false)
