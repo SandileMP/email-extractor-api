@@ -78,7 +78,7 @@ export default function Home() {
       <nav className="fixed top-0 inset-x-0 z-50 border-b border-white/5 backdrop-blur-xl bg-[#07080f]/80">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-[11px] font-black text-black">M</div>
+            <img src="/icon.svg" alt="MeshParse" className="w-7 h-7" />
             <span className="font-bold text-lg tracking-tight">MeshParse</span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm text-zinc-400">
@@ -365,7 +365,7 @@ export default function Home() {
       <footer className="border-t border-white/5 py-10 bg-[#07080f]">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-[10px] font-black text-black">M</div>
+            <img src="/icon.svg" alt="MeshParse" className="w-6 h-6" />
             <span className="font-bold text-sm">MeshParse</span>
             <span className="text-xs text-zinc-700 ml-1">· Web Intelligence Platform</span>
           </div>

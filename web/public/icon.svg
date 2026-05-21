@@ -1,0 +1,106 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bg" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0d1f10"/>
+      <stop offset="50%" stop-color="#0a1520"/>
+      <stop offset="100%" stop-color="#06101a"/>
+    </linearGradient>
+    <!-- Mesh gradient — green to cyan -->
+    <linearGradient id="mesh" x1="44" y1="44" x2="212" y2="212" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <!-- Line gradient -->
+    <linearGradient id="line" x1="44" y1="44" x2="212" y2="212" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22c55e" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.7"/>
+    </linearGradient>
+    <!-- Inner glow -->
+    <radialGradient id="innerGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#22c55e" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Node glow filter -->
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Subtle glow for ghost nodes -->
+    <filter id="softglow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect width="256" height="256" rx="52" fill="url(#bg)"/>
+
+  <!-- Subtle inner glow overlay -->
+  <rect width="256" height="256" rx="52" fill="url(#innerGlow)"/>
+
+  <!-- Subtle border -->
+  <rect width="256" height="256" rx="52" fill="none" stroke="url(#mesh)" stroke-opacity="0.12" stroke-width="1.5"/>
+
+  <!--
+    3×3 grid of nodes.
+    Positions: cols at x=44,128,212  rows at y=44,128,212
+    The 5 active (bright) nodes form an M:
+      BL=(44,212)  TL=(44,44)  C=(128,128)  TR=(212,44)  BR=(212,212)
+    The 4 ghost nodes are the midpoints:
+      TC=(128,44)  ML=(44,128)  MR=(212,128)  BC=(128,212)
+  -->
+
+  <!-- Ghost nodes — subtle mesh dots -->
+  <circle cx="128" cy="44"  r="8" fill="white" fill-opacity="0.07"/>
+  <circle cx="44"  cy="128" r="8" fill="white" fill-opacity="0.07"/>
+  <circle cx="212" cy="128" r="8" fill="white" fill-opacity="0.07"/>
+  <circle cx="128" cy="212" r="8" fill="white" fill-opacity="0.07"/>
+
+  <!-- Faint cross-lines between ghost nodes (the underlying mesh grid) -->
+  <line x1="128" y1="44"  x2="44"  y2="128" stroke="white" stroke-opacity="0.04" stroke-width="1.5" stroke-dasharray="4 6"/>
+  <line x1="128" y1="44"  x2="212" y2="128" stroke="white" stroke-opacity="0.04" stroke-width="1.5" stroke-dasharray="4 6"/>
+  <line x1="44"  y1="128" x2="128" y2="212" stroke="white" stroke-opacity="0.04" stroke-width="1.5" stroke-dasharray="4 6"/>
+  <line x1="212" y1="128" x2="128" y2="212" stroke="white" stroke-opacity="0.04" stroke-width="1.5" stroke-dasharray="4 6"/>
+
+  <!-- M stroke connections -->
+  <!-- Left vertical: BL → TL -->
+  <line x1="44" y1="212" x2="44" y2="44"
+        stroke="url(#line)" stroke-width="6" stroke-linecap="round"/>
+  <!-- Left diagonal: TL → C -->
+  <line x1="44" y1="44" x2="128" y2="128"
+        stroke="url(#line)" stroke-width="6" stroke-linecap="round"/>
+  <!-- Right diagonal: C → TR -->
+  <line x1="128" y1="128" x2="212" y2="44"
+        stroke="url(#line)" stroke-width="6" stroke-linecap="round"/>
+  <!-- Right vertical: TR → BR -->
+  <line x1="212" y1="44" x2="212" y2="212"
+        stroke="url(#line)" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Active nodes (the 5 M nodes) with glow -->
+  <!-- Bottom-left -->
+  <circle cx="44" cy="212" r="14" fill="url(#mesh)" fill-opacity="0.2" filter="url(#glow)"/>
+  <circle cx="44" cy="212" r="10" fill="url(#mesh)" filter="url(#glow)"/>
+
+  <!-- Top-left -->
+  <circle cx="44" cy="44" r="14" fill="url(#mesh)" fill-opacity="0.2" filter="url(#glow)"/>
+  <circle cx="44" cy="44" r="10" fill="url(#mesh)" filter="url(#glow)"/>
+
+  <!-- Centre -->
+  <circle cx="128" cy="128" r="16" fill="url(#mesh)" fill-opacity="0.25" filter="url(#glow)"/>
+  <circle cx="128" cy="128" r="12" fill="url(#mesh)" filter="url(#glow)"/>
+
+  <!-- Top-right -->
+  <circle cx="212" cy="44" r="14" fill="url(#mesh)" fill-opacity="0.2" filter="url(#glow)"/>
+  <circle cx="212" cy="44" r="10" fill="url(#mesh)" filter="url(#glow)"/>
+
+  <!-- Bottom-right -->
+  <circle cx="212" cy="212" r="14" fill="url(#mesh)" fill-opacity="0.2" filter="url(#glow)"/>
+  <circle cx="212" cy="212" r="10" fill="url(#mesh)" filter="url(#glow)"/>
+</svg>

@@ -34,7 +34,7 @@ export default function SignUp() {
       <div className="relative w-full max-w-sm">
         {/* Logo */}
         <Link href="/" className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center font-black text-black text-sm">M</div>
+          <img src="/icon.svg" alt="MeshParse" className="w-8 h-8" />
           <span className="font-bold text-xl">MeshParse</span>
         </Link>
 
