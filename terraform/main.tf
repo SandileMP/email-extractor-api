@@ -118,9 +118,24 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      LOG_LEVEL = "INFO"
+      LOG_LEVEL         = "INFO"
+      EXTRACTIONS_TABLE = aws_dynamodb_table.extractions.name
     }
   }
+}
+
+resource "aws_iam_role_policy" "extractor_dynamo" {
+  name = "email-extractor-extractions-dynamo"
+  role = aws_iam_role.lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["dynamodb:PutItem"]
+      Resource = [aws_dynamodb_table.extractions.arn]
+    }]
+  })
 }
 
 # ── API Gateway (HTTP API) ─────────────────────────────────────────────────

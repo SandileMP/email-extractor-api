@@ -10,6 +10,25 @@ const CHECKOUT_URL = process.env.NEXT_PUBLIC_CHECKOUT_URL!
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
+interface MailAccount {
+  account_id: string; user_id: string; label: string; host: string; port: number
+  username: string; from_email: string; from_name: string; use_tls: boolean; created_at: string
+}
+
+interface Campaign {
+  campaign_id: string; name: string; status: string; subject: string
+  recipient_count: number; sent_count: number; bounced_count: number; failed_count: number
+  from_email: string; created_at: string; sent_at: string | null
+}
+
+interface CampaignLog {
+  log_id: string; recipient: string; status: string; sent_at: string; error?: string
+}
+
+interface Extraction {
+  extraction_id: string; urls: string[]; email_count: number; created_at: string
+}
+
 interface Issue { severity: string; code: string; message: string; fix?: string }
 interface SeoScan {
   scan_id: string; url: string; score: number; status: string
@@ -99,8 +118,42 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
+  // Campaigns state
+  const [mailAccounts, setMailAccounts] = useState<MailAccount[]>([])
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [extractions, setExtractions] = useState<Extraction[]>([])
+  const [campaignsLoading, setCampaignsLoading] = useState(false)
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null)
+  const [campaignLogs, setCampaignLogs] = useState<CampaignLog[]>([])
+  const [logsLoading, setLogsLoading] = useState(false)
+
+  // Mail account form
+  const [showAccountForm, setShowAccountForm] = useState(false)
+  const [acctLabel, setAcctLabel] = useState('')
+  const [acctHost, setAcctHost] = useState('')
+  const [acctPort, setAcctPort] = useState('587')
+  const [acctUsername, setAcctUsername] = useState('')
+  const [acctPassword, setAcctPassword] = useState('')
+  const [acctFromEmail, setAcctFromEmail] = useState('')
+  const [acctFromName, setAcctFromName] = useState('')
+  const [acctTls, setAcctTls] = useState(true)
+  const [savingAccount, setSavingAccount] = useState(false)
+
+  // Campaign builder
+  const [showCampaignForm, setShowCampaignForm] = useState(false)
+  const [campName, setCampName] = useState('')
+  const [campAccount, setCampAccount] = useState('')
+  const [campSubject, setCampSubject] = useState('')
+  const [campHtml, setCampHtml] = useState('')
+  const [campText, setCampText] = useState('')
+  const [campRecipientMode, setCampRecipientMode] = useState<'paste' | 'extraction'>('paste')
+  const [campEmailsPasted, setCampEmailsPasted] = useState('')
+  const [campExtractionId, setCampExtractionId] = useState('')
+  const [creatingCampaign, setCreatingCampaign] = useState(false)
+  const [sendingCampaign, setSendingCampaign] = useState<string | null>(null)
+
   // SEO scanner state
-  const [tab, setTab] = useState<'overview' | 'seo'>('overview')
+  const [tab, setTab] = useState<'overview' | 'seo' | 'campaigns'>('overview')
   const [seoUrl, setSeoUrl] = useState('')
   const [depth, setDepth] = useState(1)
   const [maxPages, setMaxPages] = useState(5)
@@ -116,6 +169,21 @@ export default function Dashboard() {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 4000)
   }
+
+  const loadCampaignsData = useCallback(async (key: string) => {
+    setCampaignsLoading(true)
+    try {
+      const [acctRes, campRes, extRes] = await Promise.all([
+        fetch(`${API}/mail-accounts`, { headers: { 'X-API-Key': key } }),
+        fetch(`${API}/campaigns`, { headers: { 'X-API-Key': key } }),
+        fetch(`${API}/extractions`, { headers: { 'X-API-Key': key } }),
+      ])
+      if (acctRes.ok) setMailAccounts((await acctRes.json()).accounts || [])
+      if (campRes.ok) setCampaigns((await campRes.json()).campaigns || [])
+      if (extRes.ok) setExtractions((await extRes.json()).extractions || [])
+    } catch { /* silent */ }
+    setCampaignsLoading(false)
+  }, [])
 
   const loadHistory = useCallback(async (key: string) => {
     setHistoryLoading(true)
@@ -266,16 +334,17 @@ export default function Dashboard() {
         <div className="flex gap-1 p-1 rounded-xl mb-8 w-fit" style={{ background: '#0d0f1a' }}>
           {[
             { id: 'overview', label: 'Overview' },
-            { id: 'seo', label: 'SEO Scanner', badge: isActive },
+            { id: 'seo', label: 'SEO Scanner' },
+            { id: 'campaigns', label: 'Campaigns' },
           ].map(t => (
-            <button key={t.id} onClick={() => setTab(t.id as typeof tab)}
+            <button key={t.id} onClick={() => {
+              setTab(t.id as typeof tab)
+              if (t.id === 'campaigns' && apiKey) loadCampaignsData(apiKey)
+            }}
               className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
                 tab === t.id ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-zinc-300'
               }`}>
               {t.label}
-              {t.id === 'seo' && !isActive && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-bold">NEW</span>
-              )}
             </button>
           ))}
         </div>
@@ -353,7 +422,7 @@ export default function Dashboard() {
             )}
 
             {/* Links */}
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid sm:grid-cols-3 gap-4">
               <a href={`${API}/docs`} target="_blank" rel="noopener noreferrer"
                 className="flex items-center justify-between p-5 rounded-xl border border-white/5 hover:border-white/10 transition-colors group"
                 style={{ background: '#0d0f1a' }}>
@@ -367,10 +436,19 @@ export default function Dashboard() {
                 className="flex items-center justify-between p-5 rounded-xl border border-emerald-500/20 hover:border-emerald-500/30 transition-colors text-left group"
                 style={{ background: 'linear-gradient(135deg,#0d1a12,#0a0f1e)' }}>
                 <div>
-                  <p className="font-semibold text-sm mb-0.5 text-emerald-400">SEO Scanner ✨</p>
+                  <p className="font-semibold text-sm mb-0.5 text-emerald-400">SEO Scanner</p>
                   <p className="text-xs text-zinc-500">Audit any website for SEO issues</p>
                 </div>
                 <span className="text-emerald-500 group-hover:text-emerald-400 transition-colors">→</span>
+              </button>
+              <button onClick={() => { setTab('campaigns'); if (apiKey) loadCampaignsData(apiKey) }}
+                className="flex items-center justify-between p-5 rounded-xl border border-cyan-500/20 hover:border-cyan-500/30 transition-colors text-left group"
+                style={{ background: 'linear-gradient(135deg,#0a1a1e,#0a0f1e)' }}>
+                <div>
+                  <p className="font-semibold text-sm mb-0.5 text-cyan-400">Email Campaigns</p>
+                  <p className="text-xs text-zinc-500">Send campaigns via your SMTP</p>
+                </div>
+                <span className="text-cyan-500 group-hover:text-cyan-400 transition-colors">→</span>
               </button>
             </div>
 
@@ -385,6 +463,420 @@ export default function Dashboard() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── CAMPAIGNS TAB ───────────────────────────────────────────── */}
+        {tab === 'campaigns' && (
+          <div className="space-y-6">
+            {!isActive && (
+              <div className="rounded-xl border border-emerald-500/20 p-6 flex items-center gap-4"
+                style={{ background: 'linear-gradient(135deg,#0d1a12,#0a0f1e)' }}>
+                <span className="text-3xl">📧</span>
+                <div className="flex-1">
+                  <p className="font-semibold mb-1">Email Campaigns requires an active subscription</p>
+                  <p className="text-sm text-zinc-400">Subscribe to send campaigns using your own SMTP credentials.</p>
+                </div>
+                <button onClick={subscribe} disabled={checkingOut}
+                  className="flex-shrink-0 px-5 py-2 font-bold text-black rounded-lg text-sm"
+                  style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)' }}>
+                  Subscribe →
+                </button>
+              </div>
+            )}
+
+            {/* ── Mail accounts ── */}
+            <div className="rounded-xl border border-white/5" style={{ background: '#0d0f1a' }}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+                <div>
+                  <h2 className="font-semibold">Mail Accounts</h2>
+                  <p className="text-xs text-zinc-500 mt-0.5">Your SMTP credentials — used to send campaigns</p>
+                </div>
+                {isActive && (
+                  <button onClick={() => setShowAccountForm(v => !v)}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5 transition-colors text-zinc-300">
+                    {showAccountForm ? 'Cancel' : '+ Add account'}
+                  </button>
+                )}
+              </div>
+
+              {showAccountForm && (
+                <div className="p-6 border-b border-white/5 space-y-4">
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    {[
+                      { label: 'Label', value: acctLabel, set: setAcctLabel, placeholder: 'e.g. Work Gmail' },
+                      { label: 'From name', value: acctFromName, set: setAcctFromName, placeholder: 'Your Name' },
+                      { label: 'From email', value: acctFromEmail, set: setAcctFromEmail, placeholder: 'you@example.com' },
+                      { label: 'Username', value: acctUsername, set: setAcctUsername, placeholder: 'SMTP username' },
+                    ].map(f => (
+                      <div key={f.label}>
+                        <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">{f.label}</label>
+                        <input value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.placeholder}
+                          className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
+                          style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}/>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">SMTP host</label>
+                      <input value={acctHost} onChange={e => setAcctHost(e.target.value)} placeholder="smtp.gmail.com"
+                        className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
+                        style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}/>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">Port</label>
+                      <input value={acctPort} onChange={e => setAcctPort(e.target.value)} placeholder="587"
+                        className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
+                        style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}/>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">Password</label>
+                      <input type="password" value={acctPassword} onChange={e => setAcctPassword(e.target.value)} placeholder="App password"
+                        className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
+                        style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}/>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <div className={`w-9 h-5 rounded-full relative transition-colors ${acctTls ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+                        onClick={() => setAcctTls(v => !v)}>
+                        <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-transform ${acctTls ? 'translate-x-4' : 'translate-x-0.5'}`}/>
+                      </div>
+                      <span className="text-sm text-zinc-400">STARTTLS (port 587) — disable for SSL port 465</span>
+                    </label>
+                  </div>
+                  <button
+                    disabled={savingAccount || !acctLabel || !acctHost || !acctUsername || !acctPassword || !acctFromEmail}
+                    onClick={async () => {
+                      if (!apiKey) return
+                      setSavingAccount(true)
+                      try {
+                        const res = await fetch(`${API}/mail-accounts`, {
+                          method: 'POST',
+                          headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            label: acctLabel, host: acctHost, port: parseInt(acctPort),
+                            username: acctUsername, password: acctPassword,
+                            from_email: acctFromEmail, from_name: acctFromName, use_tls: acctTls,
+                          }),
+                        })
+                        const data = await res.json()
+                        if (data.error) { showToast(data.error, 'error') }
+                        else {
+                          showToast('Mail account added')
+                          setShowAccountForm(false)
+                          setAcctLabel(''); setAcctHost(''); setAcctPort('587')
+                          setAcctUsername(''); setAcctPassword(''); setAcctFromEmail(''); setAcctFromName('')
+                          loadCampaignsData(apiKey)
+                        }
+                      } catch { showToast('Could not save account', 'error') }
+                      setSavingAccount(false)
+                    }}
+                    className="px-5 py-2.5 font-bold text-sm rounded-lg disabled:opacity-40 transition-all"
+                    style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)', color: '#000' }}>
+                    {savingAccount ? 'Testing & saving…' : 'Save account'}
+                  </button>
+                </div>
+              )}
+
+              {campaignsLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"/>
+                </div>
+              ) : mailAccounts.length === 0 ? (
+                <p className="text-sm text-zinc-600 text-center py-8">No mail accounts yet — add one to start sending</p>
+              ) : (
+                <div className="divide-y divide-white/5">
+                  {mailAccounts.map(a => (
+                    <div key={a.account_id} className="flex items-center justify-between px-6 py-3">
+                      <div>
+                        <p className="text-sm font-semibold text-zinc-200">{a.label}</p>
+                        <p className="text-xs text-zinc-500">{a.from_email} via {a.host}:{a.port}</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (!apiKey || !confirm(`Delete "${a.label}"?`)) return
+                          await fetch(`${API}/mail-accounts/${a.account_id}`, {
+                            method: 'DELETE', headers: { 'X-API-Key': apiKey },
+                          })
+                          loadCampaignsData(apiKey)
+                        }}
+                        className="text-xs text-red-400 hover:text-red-300 transition-colors px-2 py-1 rounded border border-red-500/20 hover:bg-red-500/10">
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── Campaign list ── */}
+            <div className="rounded-xl border border-white/5" style={{ background: '#0d0f1a' }}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+                <div>
+                  <h2 className="font-semibold">Campaigns</h2>
+                  <p className="text-xs text-zinc-500 mt-0.5">Create and send email campaigns to your recipients</p>
+                </div>
+                {isActive && mailAccounts.length > 0 && (
+                  <button onClick={() => { setShowCampaignForm(v => !v); setSelectedCampaign(null) }}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5 transition-colors text-zinc-300">
+                    {showCampaignForm ? 'Cancel' : '+ New campaign'}
+                  </button>
+                )}
+              </div>
+
+              {/* Campaign builder */}
+              {showCampaignForm && (
+                <div className="p-6 border-b border-white/5 space-y-5">
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">Campaign name</label>
+                      <input value={campName} onChange={e => setCampName(e.target.value)} placeholder="e.g. May Outreach"
+                        className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
+                        style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}/>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">Mail account</label>
+                      <select value={campAccount} onChange={e => setCampAccount(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
+                        style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}>
+                        <option value="">— select account —</option>
+                        {mailAccounts.map(a => (
+                          <option key={a.account_id} value={a.account_id}>{a.label} ({a.from_email})</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">Subject line</label>
+                    <input value={campSubject} onChange={e => setCampSubject(e.target.value)} placeholder="Your email subject"
+                      className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
+                      style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}/>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">HTML body</label>
+                    <textarea value={campHtml} onChange={e => setCampHtml(e.target.value)} rows={6}
+                      placeholder="<h1>Hello!</h1><p>Your message here...</p>"
+                      className="w-full px-3 py-2.5 rounded-lg text-sm outline-none font-mono resize-y"
+                      style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}/>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">Plain text (optional — auto-generated if empty)</label>
+                    <textarea value={campText} onChange={e => setCampText(e.target.value)} rows={3}
+                      placeholder="Plain text fallback..."
+                      className="w-full px-3 py-2.5 rounded-lg text-sm outline-none resize-y"
+                      style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}/>
+                  </div>
+
+                  {/* Recipient picker */}
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wider">Recipients</label>
+                    <div className="flex gap-1 p-1 rounded-lg w-fit mb-3" style={{ background: '#0a0c14', border: '1px solid #ffffff10' }}>
+                      {[
+                        { id: 'paste', label: 'Paste emails' },
+                        { id: 'extraction', label: 'From extraction' },
+                      ].map(m => (
+                        <button key={m.id} onClick={() => setCampRecipientMode(m.id as 'paste' | 'extraction')}
+                          className={`px-4 py-1.5 rounded text-xs font-semibold transition-all ${
+                            campRecipientMode === m.id ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                          }`}>{m.label}</button>
+                      ))}
+                    </div>
+
+                    {campRecipientMode === 'paste' ? (
+                      <textarea value={campEmailsPasted} onChange={e => setCampEmailsPasted(e.target.value)} rows={4}
+                        placeholder={"one@example.com\ntwo@example.com\nthree@example.com"}
+                        className="w-full px-3 py-2.5 rounded-lg text-sm outline-none font-mono resize-y"
+                        style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}/>
+                    ) : (
+                      <div>
+                        {extractions.length === 0 ? (
+                          <p className="text-sm text-zinc-600 py-4">No extractions yet — run email extraction first to build a recipient list.</p>
+                        ) : (
+                          <select value={campExtractionId} onChange={e => setCampExtractionId(e.target.value)}
+                            className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
+                            style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}>
+                            <option value="">— select extraction —</option>
+                            {extractions.map(ex => (
+                              <option key={ex.extraction_id} value={ex.extraction_id}>
+                                {ex.email_count} emails · {ex.urls.slice(0,2).join(', ')}{ex.urls.length > 2 ? ` +${ex.urls.length - 2}` : ''} · {new Date(ex.created_at).toLocaleDateString()}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    disabled={creatingCampaign || !campName || !campAccount || !campSubject || !campHtml ||
+                      (campRecipientMode === 'paste' && !campEmailsPasted.trim()) ||
+                      (campRecipientMode === 'extraction' && !campExtractionId)}
+                    onClick={async () => {
+                      if (!apiKey) return
+                      setCreatingCampaign(true)
+                      const recipients = campRecipientMode === 'paste'
+                        ? campEmailsPasted.split(/[\n,;]+/).map(e => e.trim()).filter(Boolean)
+                        : []
+                      try {
+                        const res = await fetch(`${API}/campaigns`, {
+                          method: 'POST',
+                          headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            name: campName, mail_account_id: campAccount,
+                            subject: campSubject, html_body: campHtml,
+                            text_body: campText || undefined,
+                            recipients,
+                            extraction_id: campRecipientMode === 'extraction' ? campExtractionId : undefined,
+                          }),
+                        })
+                        const data = await res.json()
+                        if (data.error) { showToast(data.error, 'error') }
+                        else {
+                          showToast(`Campaign "${campName}" created`)
+                          setShowCampaignForm(false)
+                          setCampName(''); setCampAccount(''); setCampSubject(''); setCampHtml(''); setCampText('')
+                          setCampEmailsPasted(''); setCampExtractionId('')
+                          loadCampaignsData(apiKey)
+                        }
+                      } catch { showToast('Could not create campaign', 'error') }
+                      setCreatingCampaign(false)
+                    }}
+                    className="px-5 py-2.5 font-bold text-sm rounded-lg disabled:opacity-40 transition-all"
+                    style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)', color: '#000' }}>
+                    {creatingCampaign ? 'Creating…' : 'Create campaign'}
+                  </button>
+                </div>
+              )}
+
+              {/* Campaign list */}
+              {!showCampaignForm && (
+                campaignsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"/>
+                  </div>
+                ) : campaigns.length === 0 ? (
+                  <p className="text-sm text-zinc-600 text-center py-8">No campaigns yet — create your first campaign above</p>
+                ) : (
+                  <div className="divide-y divide-white/5">
+                    {campaigns.map(c => {
+                      const statusColor: Record<string,string> = {
+                        draft: 'text-zinc-400', queued: 'text-blue-400',
+                        sending: 'text-yellow-400', sent: 'text-emerald-400', failed: 'text-red-400',
+                      }
+                      return (
+                        <div key={c.campaign_id}
+                          className="px-6 py-4 hover:bg-white/3 cursor-pointer transition-colors"
+                          onClick={async () => {
+                            if (selectedCampaign?.campaign_id === c.campaign_id) {
+                              setSelectedCampaign(null); setCampaignLogs([]); return
+                            }
+                            setSelectedCampaign(c)
+                            if (!apiKey) return
+                            setLogsLoading(true)
+                            try {
+                              const res = await fetch(`${API}/campaigns/${c.campaign_id}/logs`, {
+                                headers: { 'X-API-Key': apiKey },
+                              })
+                              if (res.ok) setCampaignLogs((await res.json()).logs || [])
+                            } catch { /* silent */ }
+                            setLogsLoading(false)
+                          }}>
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-semibold text-sm text-zinc-200">{c.name}</span>
+                                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                                  c.status === 'draft' ? 'border-zinc-600 text-zinc-400' :
+                                  c.status === 'queued' ? 'border-blue-500/30 text-blue-400 bg-blue-500/10' :
+                                  c.status === 'sending' ? 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10' :
+                                  c.status === 'sent' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' :
+                                  'border-red-500/30 text-red-400 bg-red-500/10'
+                                }`}>{c.status}</span>
+                              </div>
+                              <p className="text-xs text-zinc-500 truncate">{c.subject}</p>
+                              <div className="flex gap-3 mt-1.5 text-xs text-zinc-600">
+                                <span>{c.recipient_count} recipients</span>
+                                {c.sent_count > 0 && <span className="text-emerald-600">{c.sent_count} sent</span>}
+                                {c.bounced_count > 0 && <span className="text-red-600">{c.bounced_count} bounced</span>}
+                                {c.failed_count > 0 && <span className="text-red-600">{c.failed_count} failed</span>}
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                              <span className="text-xs text-zinc-600">{new Date(c.created_at).toLocaleDateString()}</span>
+                              {c.status === 'draft' && (
+                                <button
+                                  disabled={sendingCampaign === c.campaign_id}
+                                  onClick={async e => {
+                                    e.stopPropagation()
+                                    if (!apiKey) return
+                                    setSendingCampaign(c.campaign_id)
+                                    try {
+                                      const res = await fetch(`${API}/campaigns/${c.campaign_id}/send`, {
+                                        method: 'POST', headers: { 'X-API-Key': apiKey },
+                                      })
+                                      const data = await res.json()
+                                      if (data.error) showToast(data.error, 'error')
+                                      else { showToast(`Campaign queued — ${data.queued} recipients`); loadCampaignsData(apiKey) }
+                                    } catch { showToast('Could not send campaign', 'error') }
+                                    setSendingCampaign(null)
+                                  }}
+                                  className="text-xs px-3 py-1 rounded-lg font-bold disabled:opacity-50"
+                                  style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)', color: '#000' }}>
+                                  {sendingCampaign === c.campaign_id ? 'Queuing…' : 'Send →'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Inline logs panel */}
+                          {selectedCampaign?.campaign_id === c.campaign_id && (
+                            <div className="mt-4 rounded-xl border border-white/5 overflow-hidden" style={{ background: '#0a0c14' }}
+                              onClick={e => e.stopPropagation()}>
+                              <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+                                <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Delivery log</span>
+                                <button onClick={async () => {
+                                  if (!apiKey) return
+                                  setLogsLoading(true)
+                                  const res = await fetch(`${API}/campaigns/${c.campaign_id}/logs`, { headers: { 'X-API-Key': apiKey } })
+                                  if (res.ok) setCampaignLogs((await res.json()).logs || [])
+                                  setLogsLoading(false)
+                                }} className="text-xs text-zinc-600 hover:text-white transition-colors">Refresh</button>
+                              </div>
+                              {logsLoading ? (
+                                <div className="flex justify-center py-6">
+                                  <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"/>
+                                </div>
+                              ) : campaignLogs.length === 0 ? (
+                                <p className="text-xs text-zinc-600 text-center py-6">No delivery logs yet</p>
+                              ) : (
+                                <div className="max-h-60 overflow-y-auto divide-y divide-white/5">
+                                  {campaignLogs.map(l => (
+                                    <div key={l.log_id} className="flex items-center justify-between px-4 py-2">
+                                      <span className="text-xs text-zinc-300 font-mono truncate max-w-[60%]">{l.recipient}</span>
+                                      <div className="flex items-center gap-2 flex-shrink-0">
+                                        {l.error && <span className="text-[10px] text-zinc-600 truncate max-w-[120px]">{l.error}</span>}
+                                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                                          l.status === 'sent' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' :
+                                          l.status === 'bounced' ? 'border-red-500/30 text-red-400 bg-red-500/10' :
+                                          l.status === 'suppressed' ? 'border-zinc-600 text-zinc-500' :
+                                          'border-red-500/30 text-red-400 bg-red-500/10'
+                                        }`}>{l.status}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              )}
+            </div>
           </div>
         )}
 

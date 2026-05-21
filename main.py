@@ -1,13 +1,27 @@
 import logging
+import os
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
 
-from fastapi import FastAPI
+import boto3
+from fastapi import FastAPI, Request
 from fastapi.openapi.utils import get_openapi
 from mangum import Mangum
 from pydantic import BaseModel, Field, field_validator
 
 from scraper import extract_emails
+
+# Persist extractions so users can reference them in campaigns
+_dynamo = None
+def _get_table():
+    global _dynamo
+    if _dynamo is None:
+        table_name = os.environ.get("EXTRACTIONS_TABLE", "")
+        if table_name:
+            _dynamo = boto3.resource("dynamodb", region_name=os.environ.get("AWS_REGION","eu-west-1")).Table(table_name)
+    return _dynamo
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -147,7 +161,7 @@ class EmailResponse(BaseModel):
         422: {"description": "Validation error — empty list, invalid URL, or > 50 URLs."},
     },
 )
-def get_emails(payload: EmailRequest) -> EmailResponse:
+def get_emails(payload: EmailRequest, request: Request) -> EmailResponse:
     """
     Submit a list of website URLs and receive the email addresses scraped from each.
 
@@ -167,7 +181,42 @@ def get_emails(payload: EmailRequest) -> EmailResponse:
                 logger.error("Unexpected error for %s: %s", url, exc)
                 results[url] = []
 
+    # Persist extraction so users can reference results in campaigns
+    _persist_extraction(request, results)
+
     return EmailResponse(emails=results)
+
+
+def _persist_extraction(request: Request, emails: dict[str, list[str]]) -> None:
+    try:
+        table = _get_table()
+        if not table:
+            return
+        user_id = ""
+        # Pull user_email from Lambda authorizer context (injected by API Gateway)
+        scope = request.scope
+        aws_event = scope.get("aws.event", {})
+        user_id = (aws_event.get("requestContext", {})
+                             .get("authorizer", {})
+                             .get("lambda", {})
+                             .get("user_email", ""))
+        if not user_id:
+            return
+
+        email_count = sum(len(v) for v in emails.values())
+        expires = int((datetime.now(timezone.utc) + timedelta(days=30)).timestamp())
+
+        table.put_item(Item={
+            "extraction_id": str(uuid.uuid4()),
+            "user_id":       user_id,
+            "urls":          list(emails.keys()),
+            "emails":        emails,
+            "email_count":   email_count,
+            "created_at":    datetime.now(timezone.utc).isoformat(),
+            "expires_at":    expires,
+        })
+    except Exception as exc:
+        logger.warning("Could not persist extraction: %s", exc)
 
 
 @app.get(
