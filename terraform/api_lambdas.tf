@@ -69,7 +69,7 @@ resource "aws_lambda_function" "checkout" {
   environment {
     variables = {
       PAYSTACK_SECRET_KEY       = data.aws_ssm_parameter.paystack_secret.value
-      PAYSTACK_PLAN_CODE        = "PLN_y8k9doi50zd8vqh" # R10 test (swap to PLN_bsy0r947pyura5e for prod)
+      PAYSTACK_PLAN_CODE        = "PLN_8z6nmuq1xixsur0" # R999/month MeshParse Pro
       APP_URL                   = "https://meshparse.com"
       SUPABASE_URL              = "https://ajyrrxrxcywooyrahioi.supabase.co"
       SUPABASE_SERVICE_ROLE_KEY = data.aws_ssm_parameter.supabase_service_key.value
