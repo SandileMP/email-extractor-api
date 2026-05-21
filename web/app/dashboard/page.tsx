@@ -6,7 +6,6 @@ import { createClient } from '@/utils/supabase/client'
 import type { User } from '@supabase/supabase-js'
 
 const API = 'https://ebfczvv0p2.execute-api.eu-west-1.amazonaws.com'
-const CHECKOUT_URL = process.env.NEXT_PUBLIC_CHECKOUT_URL!
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -112,10 +111,6 @@ export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null)
   const [apiKey, setApiKey] = useState<string | null>(null)
   const [subStatus, setSubStatus] = useState('inactive')
-  const [showKey, setShowKey] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [checkingOut, setCheckingOut] = useState(false)
-  const [cancelling, setCancelling] = useState(false)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
@@ -173,7 +168,8 @@ export default function Dashboard() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // SEO scanner state
-  const [tab, setTab] = useState<'overview' | 'seo' | 'extraction' | 'campaigns'>('overview')
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [tab, setTab] = useState<'extraction' | 'seo' | 'campaigns'>('extraction')
   const [seoUrl, setSeoUrl] = useState('')
   const [depth, setDepth] = useState(1)
   const [maxPages, setMaxPages] = useState(5)
@@ -251,37 +247,6 @@ export default function Dashboard() {
     return () => subscription.unsubscribe()
   }, [router, loadHistory])
 
-  async function subscribe() {
-    if (!user) return
-    setCheckingOut(true)
-    try {
-      const res = await fetch(CHECKOUT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: user.email, user_id: user.id }),
-      })
-      const { url, error } = await res.json()
-      if (url) window.location.href = url
-      else { showToast(error ?? 'Could not start checkout', 'error'); setCheckingOut(false) }
-    } catch { showToast('Could not reach checkout', 'error'); setCheckingOut(false) }
-  }
-
-  async function cancelSubscription() {
-    if (!user || !confirm('Cancel your subscription? Your API key will be deactivated.')) return
-    setCancelling(true)
-    try {
-      const res = await fetch(`${API}/cancel`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.id }),
-      })
-      const data = await res.json()
-      if (data.cancelled) { setSubStatus('inactive'); setApiKey(null); showToast('Subscription cancelled') }
-      else showToast(data.error ?? 'Could not cancel', 'error')
-    } catch { showToast('Could not reach cancellation service', 'error') }
-    setCancelling(false)
-  }
-
   async function runSeoScan() {
     if (!apiKey || !seoUrl.trim()) return
     setSeoError('')
@@ -305,18 +270,11 @@ export default function Dashboard() {
     setScanning(false)
   }
 
-  async function copyKey() {
-    if (!apiKey) return
-    await navigator.clipboard.writeText(apiKey)
-    setCopied(true); setTimeout(() => setCopied(false), 2000)
-  }
-
   async function logout() {
     await createClient().auth.signOut(); router.push('/')
   }
 
   const isActive = subStatus === 'active'
-  const maskedKey = apiKey ? `${apiKey.slice(0, 14)}${'•'.repeat(20)}` : null
 
   async function parseFile(file: File) {
     setExtractUploadError('')
@@ -384,9 +342,38 @@ export default function Dashboard() {
             <img src="/icon.svg" alt="MeshParse" className="w-7 h-7" />
             <span className="font-bold">MeshParse</span>
           </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-zinc-500 hidden sm:block">{user?.email}</span>
-            <button onClick={logout} className="text-sm text-zinc-400 hover:text-white transition-colors">Sign out</button>
+          {/* Profile dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setProfileOpen(v => !v)}
+              className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-white/8 hover:border-white/15 hover:bg-white/5 transition-all">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg,#22c55e30,#06b6d430)', border: '1px solid #22c55e20' }}>
+                {user?.email?.[0]?.toUpperCase()}
+              </div>
+              <span className="text-sm text-zinc-400 hidden sm:block max-w-[160px] truncate">{user?.email}</span>
+              <span className="text-zinc-600 text-xs">{profileOpen ? '▴' : '▾'}</span>
+            </button>
+            {profileOpen && (
+              <div className="absolute right-0 mt-2 w-52 rounded-xl border border-white/10 shadow-2xl overflow-hidden z-50"
+                style={{ background: '#0d0f1a' }}>
+                <div className="px-4 py-3 border-b border-white/5">
+                  <p className="text-xs text-zinc-600 truncate">{user?.email}</p>
+                  <span className={`text-[10px] font-bold mt-1 inline-block ${isActive ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                    {isActive ? '● Active' : '○ Inactive'}
+                  </span>
+                </div>
+                <Link href="/dashboard/account"
+                  onClick={() => setProfileOpen(false)}
+                  className="flex items-center gap-2 px-4 py-3 text-sm text-zinc-300 hover:bg-white/5 hover:text-white transition-colors">
+                  <span>👤</span> Account & API key
+                </Link>
+                <button onClick={() => { setProfileOpen(false); logout() }}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-sm text-zinc-400 hover:bg-white/5 hover:text-white transition-colors border-t border-white/5">
+                  <span>↩</span> Sign out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </nav>
@@ -395,16 +382,11 @@ export default function Dashboard() {
         {/* Header + tabs */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Dashboard</h1>
-          <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
-            isActive ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                     : 'bg-zinc-800 border-zinc-700 text-zinc-500'
-          }`}>{isActive ? '● Active' : '○ Inactive'}</span>
         </div>
 
         {/* Tab bar */}
         <div className="flex gap-1 p-1 rounded-xl mb-8 w-fit" style={{ background: '#0d0f1a' }}>
           {[
-            { id: 'overview',   label: 'Overview' },
             { id: 'extraction', label: 'Email Extraction' },
             { id: 'seo',        label: 'SEO Scanner' },
             { id: 'campaigns',  label: 'Campaigns' },
@@ -422,123 +404,6 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* ── OVERVIEW TAB ────────────────────────────────────────────── */}
-        {tab === 'overview' && (
-          <div className="space-y-6">
-            {/* Status cards */}
-            <div className="grid sm:grid-cols-3 gap-4">
-              {[
-                { label: 'Plan', value: isActive ? 'MeshParse Pro' : 'No plan' },
-                { label: 'Billing', value: isActive ? 'R999 / month' : '—' },
-                { label: 'Status', value: isActive ? 'Active' : 'Inactive' },
-              ].map(c => (
-                <div key={c.label} className="p-5 rounded-xl border border-white/5" style={{ background: '#0d0f1a' }}>
-                  <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">{c.label}</p>
-                  <p className="font-semibold">{c.value}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* API key */}
-            <div className="rounded-xl border border-white/5" style={{ background: '#0d0f1a' }}>
-              <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
-                <h2 className="font-semibold">API Key</h2>
-                {apiKey && (
-                  <div className="flex gap-2">
-                    <button onClick={() => setShowKey(v => !v)}
-                      className="text-xs px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5 transition-colors text-zinc-400">
-                      {showKey ? 'Hide' : 'Reveal'}
-                    </button>
-                    <button onClick={copyKey}
-                      className="text-xs px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5 transition-colors text-zinc-400">
-                      {copied ? '✓ Copied' : 'Copy'}
-                    </button>
-                  </div>
-                )}
-              </div>
-              <div className="px-6 py-5">
-                {apiKey ? (
-                  <div className="font-mono text-sm text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 rounded-lg px-4 py-3 break-all">
-                    {showKey ? apiKey : maskedKey}
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    {isActive
-                      ? <p className="text-sm text-zinc-400">Your API key is being provisioned…</p>
-                      : (
-                        <div>
-                          <p className="text-sm text-zinc-400 mb-4">Subscribe to unlock your API key and all features</p>
-                          <button onClick={subscribe} disabled={checkingOut}
-                            className="px-6 py-2.5 font-bold text-black rounded-xl text-sm disabled:opacity-50"
-                            style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)' }}>
-                            {checkingOut ? 'Redirecting…' : 'Subscribe — R999/month →'}
-                          </button>
-                        </div>
-                      )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Quick start */}
-            {apiKey && (
-              <div className="rounded-xl border border-white/5" style={{ background: '#0d0f1a' }}>
-                <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between">
-                  <h2 className="font-semibold">Quick start</h2>
-                  <span className="text-xs text-zinc-500">Email extraction</span>
-                </div>
-                <pre className="p-6 text-[13px] font-mono text-emerald-400 overflow-x-auto leading-relaxed">{`curl -X POST ${API}/emails \\
-  -H "X-API-Key: ${showKey && apiKey ? apiKey : 'mp_live_your_key'}" \\
-  -H "Content-Type: application/json" \\
-  -d '{"urls":["https://example.com"]}'`}</pre>
-              </div>
-            )}
-
-            {/* Links */}
-            <div className="grid sm:grid-cols-3 gap-4">
-              <a href={`${API}/docs`} target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-between p-5 rounded-xl border border-white/5 hover:border-white/10 transition-colors group"
-                style={{ background: '#0d0f1a' }}>
-                <div>
-                  <p className="font-semibold text-sm mb-0.5">API Documentation</p>
-                  <p className="text-xs text-zinc-500">Swagger UI for all endpoints</p>
-                </div>
-                <span className="text-zinc-500 group-hover:text-white transition-colors">↗</span>
-              </a>
-              <button onClick={() => setTab('seo')}
-                className="flex items-center justify-between p-5 rounded-xl border border-emerald-500/20 hover:border-emerald-500/30 transition-colors text-left group"
-                style={{ background: 'linear-gradient(135deg,#0d1a12,#0a0f1e)' }}>
-                <div>
-                  <p className="font-semibold text-sm mb-0.5 text-emerald-400">SEO Scanner</p>
-                  <p className="text-xs text-zinc-500">Audit any website for SEO issues</p>
-                </div>
-                <span className="text-emerald-500 group-hover:text-emerald-400 transition-colors">→</span>
-              </button>
-              <button onClick={() => { setTab('campaigns'); if (apiKey) loadCampaignsData(apiKey) }}
-                className="flex items-center justify-between p-5 rounded-xl border border-cyan-500/20 hover:border-cyan-500/30 transition-colors text-left group"
-                style={{ background: 'linear-gradient(135deg,#0a1a1e,#0a0f1e)' }}>
-                <div>
-                  <p className="font-semibold text-sm mb-0.5 text-cyan-400">Email Campaigns</p>
-                  <p className="text-xs text-zinc-500">Send campaigns via your SMTP</p>
-                </div>
-                <span className="text-cyan-500 group-hover:text-cyan-400 transition-colors">→</span>
-              </button>
-            </div>
-
-            {/* Danger zone */}
-            {isActive && (
-              <div className="rounded-xl border border-red-500/10 p-6" style={{ background: '#0d0f1a' }}>
-                <h3 className="font-semibold text-sm mb-1 text-red-400">Danger zone</h3>
-                <p className="text-xs text-zinc-500 mb-4">Cancelling will immediately deactivate your API key. You can resubscribe at any time.</p>
-                <button onClick={cancelSubscription} disabled={cancelling}
-                  className="text-sm px-4 py-2 rounded-lg border border-red-500/20 text-red-400 hover:bg-red-500/10 disabled:opacity-50 transition-colors">
-                  {cancelling ? 'Cancelling…' : 'Cancel subscription'}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* ── EXTRACTION TAB ──────────────────────────────────────────── */}
         {tab === 'extraction' && (
           <div className="space-y-6">
@@ -550,11 +415,11 @@ export default function Dashboard() {
                   <p className="font-semibold mb-1">Email Extraction requires an active subscription</p>
                   <p className="text-sm text-zinc-400">Subscribe to scrape email addresses from any website.</p>
                 </div>
-                <button onClick={subscribe} disabled={checkingOut}
+                <Link href="/dashboard/account"
                   className="flex-shrink-0 px-5 py-2 font-bold text-black rounded-lg text-sm"
                   style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)' }}>
                   Subscribe →
-                </button>
+                </Link>
               </div>
             )}
 
@@ -950,11 +815,11 @@ export default function Dashboard() {
                   <p className="font-semibold mb-1">Email Campaigns requires an active subscription</p>
                   <p className="text-sm text-zinc-400">Subscribe to send campaigns using your own SMTP credentials.</p>
                 </div>
-                <button onClick={subscribe} disabled={checkingOut}
+                <Link href="/dashboard/account"
                   className="flex-shrink-0 px-5 py-2 font-bold text-black rounded-lg text-sm"
                   style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)' }}>
                   Subscribe →
-                </button>
+                </Link>
               </div>
             )}
 
@@ -1541,11 +1406,11 @@ export default function Dashboard() {
                   <p className="font-semibold mb-1">SEO Scanner requires an active subscription</p>
                   <p className="text-sm text-zinc-400">Subscribe to get your API key and start scanning.</p>
                 </div>
-                <button onClick={subscribe} disabled={checkingOut}
+                <Link href="/dashboard/account"
                   className="flex-shrink-0 px-5 py-2 font-bold text-black rounded-lg text-sm"
                   style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)' }}>
                   Subscribe →
-                </button>
+                </Link>
               </div>
             )}
 
