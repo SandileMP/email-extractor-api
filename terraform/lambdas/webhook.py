@@ -164,19 +164,26 @@ def handler(event, context):
         elif etype in ("subscription.disable", "subscription.not_renew"):
             sub_code = data.get("subscription_code", "")
             sub = get_subscription_by_code(sub_code)
-            if sub:
-                set_subscription_status(sub["user_id"], "inactive")
-                deactivate_keys(sub["user_id"])
-                print(f"Deactivated subscription {sub_code}")
-            else:
-                # subscription.create may not have fired yet — look up by customer_code
+
+            if not sub:
+                # Fallback: look up by customer_code
                 cust_code = data.get("customer", {}).get("customer_code", "")
-                rows = _sb_get(f"/rest/v1/subscriptions?customer_code=eq.{cust_code}&limit=1&select=user_id")
+                rows = _sb_get(f"/rest/v1/subscriptions?customer_code=eq.{cust_code}&limit=1&select=user_id,subscription_code")
                 if rows:
-                    uid = rows[0]["user_id"]
-                    set_subscription_status(uid, "inactive")
-                    deactivate_keys(uid)
-                    print(f"Deactivated via customer_code {cust_code}")
+                    sub = rows[0]
+
+            if sub:
+                user_id = sub["user_id"]
+                # Only deactivate if the subscription being disabled matches
+                # what's currently stored (guards against stale webhooks from
+                # old cancelled subscriptions firing after a re-subscription)
+                current = _sb_get(f"/rest/v1/subscriptions?user_id=eq.{user_id}&limit=1&select=subscription_code,status")
+                if current and current[0].get("subscription_code") == sub_code:
+                    set_subscription_status(user_id, "inactive")
+                    deactivate_keys(user_id)
+                    print(f"Deactivated subscription {sub_code} for {user_id}")
+                else:
+                    print(f"Skipped deactivation: {sub_code} is not the current active subscription for {user_id}")
 
     except Exception as exc:
         print(f"Webhook error: {exc}")
