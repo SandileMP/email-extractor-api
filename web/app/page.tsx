@@ -31,15 +31,15 @@ const PRODUCTS = [
     live: true,
   },
   {
-    tag: 'Coming soon',
-    tagColor: '#a855f7',
+    tag: 'Available now',
+    tagColor: '#06b6d4',
     icon: '📣',
     title: 'Email Campaigns',
-    desc: 'Build and send targeted campaigns to your extracted contact lists. Design templates, track opens and clicks, and automate follow-up sequences.',
-    features: ['Drag-and-drop builder', 'Open & click tracking', 'Automated sequences', 'List segmentation'],
-    cta: 'Join waitlist',
+    desc: 'Send targeted campaigns to your extracted contact lists using your own SMTP credentials. No per-email fees — bring your own mail provider.',
+    features: ['Use your own SMTP server', 'Recipients from extractions', 'Bounce & suppression handling', 'Per-recipient delivery logs'],
+    cta: 'Start sending',
     href: '/signup',
-    live: false,
+    live: true,
   },
 ]
 
@@ -303,7 +303,7 @@ export default function Home() {
                   <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">All features included</span>
                 </div>
                 <div className="flex items-end gap-2 mb-2">
-                  <span className="text-6xl font-black">R750</span>
+                  <span className="text-6xl font-black">R999</span>
                   <span className="text-zinc-500 mb-2 text-lg">/mo</span>
                 </div>
                 <p className="text-sm text-zinc-500 mb-8">Access to all current and future platform features</p>
@@ -312,7 +312,7 @@ export default function Home() {
                   {[
                     ['✉️', 'Email Extraction API', true],
                     ['📈', 'SEO Intelligence', true],
-                    ['📣', 'Email Campaigns', false],
+                    ['📣', 'Email Campaigns', true],
                     ['🔑', 'API key management', true],
                     ['⚡', 'Unlimited API calls', true],
                     ['🛠️', 'Developer documentation', true],

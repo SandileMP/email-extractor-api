@@ -356,7 +356,7 @@ export default function Dashboard() {
             <div className="grid sm:grid-cols-3 gap-4">
               {[
                 { label: 'Plan', value: isActive ? 'MeshParse Pro' : 'No plan' },
-                { label: 'Billing', value: isActive ? 'R750 / month' : '—' },
+                { label: 'Billing', value: isActive ? 'R999 / month' : '—' },
                 { label: 'Status', value: isActive ? 'Active' : 'Inactive' },
               ].map(c => (
                 <div key={c.label} className="p-5 rounded-xl border border-white/5" style={{ background: '#0d0f1a' }}>
@@ -398,7 +398,7 @@ export default function Dashboard() {
                           <button onClick={subscribe} disabled={checkingOut}
                             className="px-6 py-2.5 font-bold text-black rounded-xl text-sm disabled:opacity-50"
                             style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)' }}>
-                            {checkingOut ? 'Redirecting…' : 'Subscribe — R750/month →'}
+                            {checkingOut ? 'Redirecting…' : 'Subscribe — R999/month →'}
                           </button>
                         </div>
                       )}
@@ -618,8 +618,12 @@ export default function Dashboard() {
                   <h2 className="font-semibold">Campaigns</h2>
                   <p className="text-xs text-zinc-500 mt-0.5">Create and send email campaigns to your recipients</p>
                 </div>
-                {isActive && mailAccounts.length > 0 && (
-                  <button onClick={() => { setShowCampaignForm(v => !v); setSelectedCampaign(null) }}
+                {isActive && (
+                  <button
+                    onClick={() => {
+                      if (mailAccounts.length === 0) { showToast('Add a mail account first', 'error'); setShowAccountForm(true); return }
+                      setShowCampaignForm(v => !v); setSelectedCampaign(null)
+                    }}
                     className="text-xs px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5 transition-colors text-zinc-300">
                     {showCampaignForm ? 'Cancel' : '+ New campaign'}
                   </button>
