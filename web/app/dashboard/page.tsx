@@ -879,109 +879,148 @@ export default function Dashboard() {
                 ) : (
                   <div className="divide-y divide-white/5">
                     {campaigns.map(c => {
-                      const statusColor: Record<string,string> = {
-                        draft: 'text-zinc-400', queued: 'text-blue-400',
-                        sending: 'text-yellow-400', sent: 'text-emerald-400', failed: 'text-red-400',
+                      const isOpen = selectedCampaign?.campaign_id === c.campaign_id
+                      const statusBadge =
+                        c.status === 'draft'   ? 'border-zinc-600 text-zinc-400 bg-zinc-800/50' :
+                        c.status === 'queued'  ? 'border-blue-500/30 text-blue-400 bg-blue-500/10' :
+                        c.status === 'sending' ? 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10' :
+                        c.status === 'sent'    ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' :
+                                                 'border-red-500/30 text-red-400 bg-red-500/10'
+
+                      const openManage = async () => {
+                        if (isOpen) { setSelectedCampaign(null); setCampaignLogs([]); return }
+                        setSelectedCampaign(c)
+                        if (!apiKey) return
+                        setLogsLoading(true)
+                        try {
+                          const res = await fetch(`${API}/campaigns/${c.campaign_id}/logs`, { headers: { 'X-API-Key': apiKey } })
+                          if (res.ok) setCampaignLogs((await res.json()).logs || [])
+                        } catch { /* silent */ }
+                        setLogsLoading(false)
                       }
+
                       return (
-                        <div key={c.campaign_id}
-                          className="px-6 py-4 hover:bg-white/3 cursor-pointer transition-colors"
-                          onClick={async () => {
-                            if (selectedCampaign?.campaign_id === c.campaign_id) {
-                              setSelectedCampaign(null); setCampaignLogs([]); return
-                            }
-                            setSelectedCampaign(c)
-                            if (!apiKey) return
-                            setLogsLoading(true)
-                            try {
-                              const res = await fetch(`${API}/campaigns/${c.campaign_id}/logs`, {
-                                headers: { 'X-API-Key': apiKey },
-                              })
-                              if (res.ok) setCampaignLogs((await res.json()).logs || [])
-                            } catch { /* silent */ }
-                            setLogsLoading(false)
-                          }}>
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-semibold text-sm text-zinc-200">{c.name}</span>
-                                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
-                                  c.status === 'draft' ? 'border-zinc-600 text-zinc-400' :
-                                  c.status === 'queued' ? 'border-blue-500/30 text-blue-400 bg-blue-500/10' :
-                                  c.status === 'sending' ? 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10' :
-                                  c.status === 'sent' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' :
-                                  'border-red-500/30 text-red-400 bg-red-500/10'
-                                }`}>{c.status}</span>
-                              </div>
-                              <p className="text-xs text-zinc-500 truncate">{c.subject}</p>
-                              <div className="flex gap-3 mt-1.5 text-xs text-zinc-600">
-                                <span>{c.recipient_count} recipients</span>
-                                {c.sent_count > 0 && <span className="text-emerald-600">{c.sent_count} sent</span>}
-                                {c.bounced_count > 0 && <span className="text-red-600">{c.bounced_count} bounced</span>}
-                                {c.failed_count > 0 && <span className="text-red-600">{c.failed_count} failed</span>}
-                              </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                              <span className="text-xs text-zinc-600">{new Date(c.created_at).toLocaleDateString()}</span>
-                              {c.status === 'draft' && (
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={e => {
-                                      e.stopPropagation()
-                                      setEditingCampaignId(c.campaign_id)
-                                      setCampName(c.name)
-                                      setCampAccount(c.mail_account_id)
-                                      setCampSubject(c.subject)
-                                      setCampHtml(c.html_body)
-                                      setCampText(c.text_body || '')
-                                      setCampEmailsPasted('')
-                                      setCampExtractionId('')
-                                      setCampRecipientMode('paste')
-                                      setShowCampaignForm(true)
-                                      setSelectedCampaign(null)
-                                      window.scrollTo({ top: 0, behavior: 'smooth' })
-                                    }}
-                                    className="text-xs px-3 py-1 rounded-lg border border-white/10 hover:bg-white/5 transition-colors text-zinc-400">
-                                    Edit
-                                  </button>
-                                  <button
-                                    disabled={sendingCampaign === c.campaign_id}
-                                    onClick={async e => {
-                                      e.stopPropagation()
-                                      if (!apiKey) return
-                                      setSendingCampaign(c.campaign_id)
-                                      try {
-                                        const res = await fetch(`${API}/campaigns/${c.campaign_id}/send`, {
-                                          method: 'POST', headers: { 'X-API-Key': apiKey },
-                                        })
-                                        const data = await res.json()
-                                        if (data.error) showToast(data.error, 'error')
-                                        else { showToast(`Campaign queued — ${data.queued} recipients`); loadCampaignsData(apiKey) }
-                                      } catch { showToast('Could not send campaign', 'error') }
-                                      setSendingCampaign(null)
-                                    }}
-                                    className="text-xs px-3 py-1 rounded-lg font-bold disabled:opacity-50"
-                                    style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)', color: '#000' }}>
-                                    {sendingCampaign === c.campaign_id ? 'Queuing…' : 'Send →'}
-                                  </button>
+                        <div key={c.campaign_id}>
+                          {/* ── Row ── */}
+                          <div className="px-6 py-4 hover:bg-white/[0.02] transition-colors cursor-pointer"
+                            onClick={openManage}>
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                                  <span className="font-semibold text-sm text-zinc-100">{c.name}</span>
+                                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${statusBadge}`}>
+                                    {c.status}
+                                  </span>
                                 </div>
-                              )}
+                                <p className="text-xs text-zinc-500 truncate mb-1.5">{c.subject}</p>
+                                <div className="flex gap-3 text-xs">
+                                  <span className="text-zinc-600">{c.recipient_count} recipients</span>
+                                  {c.sent_count > 0 && <span className="text-emerald-500">{c.sent_count} sent</span>}
+                                  {c.bounced_count > 0 && <span className="text-red-500">{c.bounced_count} bounced</span>}
+                                  {c.failed_count > 0 && <span className="text-red-500">{c.failed_count} failed</span>}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3 flex-shrink-0">
+                                <span className="text-xs text-zinc-600 hidden sm:block">{new Date(c.created_at).toLocaleDateString()}</span>
+                                <span className="text-zinc-600 text-sm transition-transform duration-200"
+                                  style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+                              </div>
                             </div>
                           </div>
 
-                          {/* Inline logs panel */}
-                          {selectedCampaign?.campaign_id === c.campaign_id && (
-                            <div className="mt-4 rounded-xl border border-white/5 overflow-hidden" style={{ background: '#0a0c14' }}
+                          {/* ── Management panel ── */}
+                          {isOpen && (
+                            <div className="border-t border-white/5 mx-6 mb-4 mt-0 rounded-xl overflow-hidden"
+                              style={{ background: '#080a12' }}
                               onClick={e => e.stopPropagation()}>
-                              <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
-                                <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Delivery log</span>
-                                <button onClick={async () => {
-                                  if (!apiKey) return
-                                  setLogsLoading(true)
-                                  const res = await fetch(`${API}/campaigns/${c.campaign_id}/logs`, { headers: { 'X-API-Key': apiKey } })
-                                  if (res.ok) setCampaignLogs((await res.json()).logs || [])
-                                  setLogsLoading(false)
-                                }} className="text-xs text-zinc-600 hover:text-white transition-colors">Refresh</button>
+
+                              {/* Action bar */}
+                              <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5 flex-wrap">
+                                {c.status === 'draft' && (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setEditingCampaignId(c.campaign_id)
+                                        setCampName(c.name)
+                                        setCampAccount(c.mail_account_id)
+                                        setCampSubject(c.subject)
+                                        setCampHtml(c.html_body)
+                                        setCampText(c.text_body || '')
+                                        setCampEmailsPasted('')
+                                        setCampExtractionId('')
+                                        setCampRecipientMode('paste')
+                                        setShowCampaignForm(true)
+                                        setSelectedCampaign(null)
+                                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                                      }}
+                                      className="text-xs px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5 transition-colors text-zinc-300 font-semibold">
+                                      ✏️ Edit campaign
+                                    </button>
+                                    <button
+                                      disabled={sendingCampaign === c.campaign_id}
+                                      onClick={async () => {
+                                        if (!apiKey) return
+                                        setSendingCampaign(c.campaign_id)
+                                        try {
+                                          const res = await fetch(`${API}/campaigns/${c.campaign_id}/send`, {
+                                            method: 'POST', headers: { 'X-API-Key': apiKey },
+                                          })
+                                          const data = await res.json()
+                                          if (data.error) showToast(data.error, 'error')
+                                          else { showToast(`Queued ${data.queued} recipients`); loadCampaignsData(apiKey) }
+                                        } catch { showToast('Could not send', 'error') }
+                                        setSendingCampaign(null)
+                                      }}
+                                      className="text-xs px-3 py-1.5 rounded-lg font-bold disabled:opacity-50 transition-all"
+                                      style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)', color: '#000' }}>
+                                      {sendingCampaign === c.campaign_id ? 'Queuing…' : '→ Send campaign'}
+                                    </button>
+                                  </>
+                                )}
+                                {(c.status === 'sending' || c.status === 'queued') && (
+                                  <span className="text-xs text-yellow-400 font-semibold flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse inline-block"/>
+                                    Sending in progress…
+                                  </span>
+                                )}
+                                {c.status === 'sent' && (
+                                  <span className="text-xs text-emerald-400 font-semibold">
+                                    ✓ Sent {c.sent_at ? `on ${new Date(c.sent_at).toLocaleString()}` : ''}
+                                  </span>
+                                )}
+                                <div className="ml-auto flex items-center gap-2">
+                                  <button
+                                    onClick={async () => {
+                                      if (!apiKey) return
+                                      setLogsLoading(true)
+                                      const res = await fetch(`${API}/campaigns/${c.campaign_id}/logs`, { headers: { 'X-API-Key': apiKey } })
+                                      if (res.ok) setCampaignLogs((await res.json()).logs || [])
+                                      setLogsLoading(false)
+                                    }}
+                                    className="text-xs text-zinc-500 hover:text-white transition-colors">
+                                    Refresh logs
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Stats row */}
+                              <div className="grid grid-cols-4 divide-x divide-white/5 border-b border-white/5">
+                                {[
+                                  { label: 'Recipients', value: c.recipient_count, color: 'text-zinc-300' },
+                                  { label: 'Sent',       value: c.sent_count,      color: 'text-emerald-400' },
+                                  { label: 'Bounced',    value: c.bounced_count,   color: c.bounced_count > 0 ? 'text-red-400' : 'text-zinc-600' },
+                                  { label: 'Failed',     value: c.failed_count,    color: c.failed_count > 0 ? 'text-red-400' : 'text-zinc-600' },
+                                ].map(s => (
+                                  <div key={s.label} className="flex flex-col items-center py-3">
+                                    <span className={`text-lg font-black ${s.color}`}>{s.value}</span>
+                                    <span className="text-[10px] text-zinc-600 uppercase tracking-wider">{s.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Delivery log */}
+                              <div className="px-4 py-2 border-b border-white/5">
+                                <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">Delivery log</span>
                               </div>
                               {logsLoading ? (
                                 <div className="flex justify-center py-6">
@@ -990,17 +1029,20 @@ export default function Dashboard() {
                               ) : campaignLogs.length === 0 ? (
                                 <p className="text-xs text-zinc-600 text-center py-6">No delivery logs yet</p>
                               ) : (
-                                <div className="max-h-60 overflow-y-auto divide-y divide-white/5">
+                                <div className="max-h-64 overflow-y-auto divide-y divide-white/5">
                                   {campaignLogs.map(l => (
-                                    <div key={l.log_id} className="flex items-center justify-between px-4 py-2">
-                                      <span className="text-xs text-zinc-300 font-mono truncate max-w-[60%]">{l.recipient}</span>
+                                    <div key={l.log_id} className="flex items-center justify-between px-4 py-2.5">
+                                      <span className="text-xs text-zinc-300 font-mono truncate max-w-[55%]">{l.recipient}</span>
                                       <div className="flex items-center gap-2 flex-shrink-0">
-                                        {l.error && <span className="text-[10px] text-zinc-600 truncate max-w-[120px]">{l.error}</span>}
+                                        <span className="text-[10px] text-zinc-600">
+                                          {new Date(l.sent_at).toLocaleTimeString()}
+                                        </span>
+                                        {l.error && <span className="text-[10px] text-red-500 truncate max-w-[100px]" title={l.error}>⚠ {l.error}</span>}
                                         <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
-                                          l.status === 'sent' ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' :
-                                          l.status === 'bounced' ? 'border-red-500/30 text-red-400 bg-red-500/10' :
-                                          l.status === 'suppressed' ? 'border-zinc-600 text-zinc-500' :
-                                          'border-red-500/30 text-red-400 bg-red-500/10'
+                                          l.status === 'sent'       ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' :
+                                          l.status === 'bounced'    ? 'border-red-500/30 text-red-400 bg-red-500/10' :
+                                          l.status === 'suppressed' ? 'border-zinc-600 text-zinc-500 bg-zinc-800' :
+                                                                      'border-red-500/30 text-red-400 bg-red-500/10'
                                         }`}>{l.status}</span>
                                       </div>
                                     </div>
