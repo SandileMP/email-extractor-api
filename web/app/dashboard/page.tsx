@@ -775,7 +775,7 @@ export default function Dashboard() {
 
             {/* Results */}
             {extractResults && (() => {
-              const allEmails = [...new Set(Object.values(extractResults).flat())].sort()
+              const allEmails = Array.from(new Set(Object.values(extractResults).flat())).sort()
               const totalUrls  = Object.keys(extractResults).length
               const hitUrls    = Object.values(extractResults).filter(e => e.length > 0).length
 
