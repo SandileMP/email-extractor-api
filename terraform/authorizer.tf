@@ -91,4 +91,10 @@ resource "aws_apigatewayv2_route" "emails_post" {
   authorization_type = "CUSTOM"
 }
 
+resource "aws_apigatewayv2_route" "emails_options" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "OPTIONS /emails"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
 # GET /health stays on $default (no auth) via Mangum fallthrough

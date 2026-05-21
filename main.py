@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 import boto3
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from mangum import Mangum
 from pydantic import BaseModel, Field, field_validator
@@ -64,6 +65,14 @@ app = FastAPI(
             "description": "Health and liveness checks.",
         },
     ],
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key"],
+    max_age=300,
 )
 
 MAX_URLS = 50
