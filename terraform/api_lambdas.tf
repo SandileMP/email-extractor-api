@@ -68,9 +68,11 @@ resource "aws_lambda_function" "checkout" {
 
   environment {
     variables = {
-      PAYSTACK_SECRET_KEY = data.aws_ssm_parameter.paystack_secret.value
-      PAYSTACK_PLAN_CODE  = "PLN_y8k9doi50zd8vqh"   # R10 test plan (switch to PLN_bsy0r947pyura5e for R750 prod)
-      APP_URL             = "https://meshparse.com"
+      PAYSTACK_SECRET_KEY       = data.aws_ssm_parameter.paystack_secret.value
+      PAYSTACK_PLAN_CODE        = "PLN_y8k9doi50zd8vqh" # R10 test (swap to PLN_bsy0r947pyura5e for prod)
+      APP_URL                   = "https://meshparse.com"
+      SUPABASE_URL              = "https://ajyrrxrxcywooyrahioi.supabase.co"
+      SUPABASE_SERVICE_ROLE_KEY = data.aws_ssm_parameter.supabase_service_key.value
     }
   }
 }
@@ -138,6 +140,18 @@ resource "aws_apigatewayv2_route" "checkout" {
 resource "aws_apigatewayv2_route" "checkout_options" {
   api_id    = aws_apigatewayv2_api.http.id
   route_key = "OPTIONS /checkout"
+  target    = "integrations/${aws_apigatewayv2_integration.checkout.id}"
+}
+
+resource "aws_apigatewayv2_route" "cancel" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "POST /cancel"
+  target    = "integrations/${aws_apigatewayv2_integration.checkout.id}"
+}
+
+resource "aws_apigatewayv2_route" "cancel_options" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "OPTIONS /cancel"
   target    = "integrations/${aws_apigatewayv2_integration.checkout.id}"
 }
 
