@@ -657,7 +657,22 @@ export default function Dashboard() {
                     return (
                       <div key={s.scan_id}
                         className="flex items-center justify-between px-6 py-3 hover:bg-white/3 cursor-pointer transition-colors"
-                        onClick={() => { setSeoUrl(s.url); setSeoResult(s); setExpandedSection(null) }}>
+                        onClick={async () => {
+                          if (!apiKey) return
+                          setSeoUrl(s.url)
+                          setExpandedSection(null)
+                          setSeoResult(null)
+                          setSeoError('')
+                          setScanning(true)
+                          try {
+                            const res = await fetch(`${API}/seo/scan/${s.scan_id}`, {
+                              headers: { 'X-API-Key': apiKey },
+                            })
+                            if (res.ok) setSeoResult(await res.json())
+                            else setSeoError('Could not load scan result')
+                          } catch { setSeoError('Failed to load scan') }
+                          setScanning(false)
+                        }}>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm text-zinc-200 truncate">{s.url}</p>
                           <p className="text-xs text-zinc-600 mt-0.5">
