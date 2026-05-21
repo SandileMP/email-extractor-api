@@ -15,6 +15,7 @@ import ssl
 import traceback
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -206,9 +207,16 @@ def _decrypt(ciphertext_b64: str) -> str:
 
 # ── Helpers ───────────────────────────────────────────────────────────────
 
+def _from_dynamo(obj):
+    if isinstance(obj, dict):    return {k: _from_dynamo(v) for k, v in obj.items()}
+    if isinstance(obj, list):    return [_from_dynamo(v) for v in obj]
+    if isinstance(obj, Decimal): return int(obj) if obj == obj.to_integral_value() else float(obj)
+    return obj
+
+
 def _safe(item):
-    """Strip encrypted password before returning to client."""
-    return {k: v for k, v in item.items() if k != "enc_password"}
+    """Strip encrypted password and convert DynamoDB types before returning."""
+    return _from_dynamo({k: v for k, v in item.items() if k != "enc_password"})
 
 
 def _valid_email(email: str) -> bool:
