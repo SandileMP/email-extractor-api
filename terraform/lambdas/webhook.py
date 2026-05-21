@@ -139,11 +139,29 @@ def handler(event, context):
     print(f"Webhook received: {etype}")
 
     try:
-        if etype == "charge.success" and data.get("plan"):
-            email       = data["customer"]["email"].lower()
-            sub_code    = data.get("subscription_code") or data.get("reference")
-            cust_code   = data["customer"]["customer_code"]
-            user_id     = (data.get("metadata") or {}).get("user_id", "")
+        if etype == "subscription.create":
+            # This event fires after charge.success and carries the real SUB_ code.
+            # Update the subscription row that charge.success created with the
+            # correct subscription_code (which may have been stored as txn reference).
+            sub_code  = data.get("subscription_code", "")
+            cust_code = data.get("customer", {}).get("customer_code", "")
+            email     = data.get("customer", {}).get("email", "").lower()
+            print(f"subscription.create: {sub_code} for {email}")
+
+            if sub_code and cust_code:
+                # Upsert by customer_code — fixes the row written by charge.success
+                import urllib.parse
+                _sb("PATCH",
+                    f"/rest/v1/subscriptions?customer_code=eq.{urllib.parse.quote(cust_code)}",
+                    {"subscription_code": sub_code, "status": "active"})
+
+        elif etype == "charge.success" and data.get("plan"):
+            email     = data["customer"]["email"].lower()
+            # Use subscription_code if present, fall back to reference as placeholder.
+            # subscription.create will overwrite with the real SUB_ code.
+            sub_code  = data.get("subscription_code") or data.get("reference", "")
+            cust_code = data["customer"]["customer_code"]
+            user_id   = (data.get("metadata") or {}).get("user_id", "")
 
             if not user_id:
                 print(f"No user_id in metadata for {email}, skipping")
