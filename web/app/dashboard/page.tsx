@@ -745,7 +745,7 @@ export default function Dashboard() {
                     } else if (extractMode === 'manual') {
                       urls = extractManualList
                     }
-                    urls = [...new Set(urls)].slice(0, 50)
+                    urls = Array.from(new Set(urls)).slice(0, 50)
 
                     try {
                       const res = await fetch(`${API}/emails`, {
