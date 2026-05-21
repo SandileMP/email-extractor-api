@@ -1,13 +1,21 @@
 """
-Campaign Lambda — CRUD + send trigger + extraction list.
+Campaign Lambda — CRUD + edit + send trigger + extraction list.
 Routes:
-  POST /campaigns              create draft
-  GET  /campaigns              list user's campaigns
-  GET  /campaigns/{id}         get campaign + live stats
-  POST /campaigns/{id}/send    queue recipients for delivery
-  GET  /campaigns/{id}/logs    paginated delivery log
-  GET  /extractions            list user's email extractions
+  POST   /campaigns              create draft
+  GET    /campaigns              list user's campaigns
+  GET    /campaigns/{id}         get campaign + live stats
+  PATCH  /campaigns/{id}         edit draft campaign
+  POST   /campaigns/{id}/send    queue recipients for delivery
+  GET    /campaigns/{id}/logs    paginated delivery log
+  GET    /extractions            list user's email extractions
+
+Recipients are stored as a list of dicts:
+  [{"email": "user@example.com", "first_name": "John", "company": "Acme"}, ...]
+Plain email strings and CSV / JSON input are all accepted.
+Template variables {{first_name}}, {{company}}, etc. are substituted at send time.
 """
+import csv
+import io
 import json
 import os
 import re
@@ -39,11 +47,11 @@ extractions_t = dynamodb.Table(EXTRACTIONS_TABLE)
 CORS = {
     "Access-Control-Allow-Origin":  "*",
     "Access-Control-Allow-Headers": "Content-Type,X-API-Key",
-    "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
     "Content-Type": "application/json",
 }
 
-CHUNK_SIZE = 50   # recipients per SQS message
+CHUNK_SIZE = 50
 
 
 # ── Handler ───────────────────────────────────────────────────────────────
@@ -58,30 +66,29 @@ def handler(event, context):
         return _ok({})
 
     try:
-        # Extractions list
         if method == "GET" and path.endswith("/extractions"):
             return _list_extractions(user_id, qs)
 
-        # Campaign send
         if method == "POST" and "/send" in path:
             campaign_id = path.split("/")[-2]
             return _send_campaign(campaign_id, user_id)
 
-        # Campaign logs
         if method == "GET" and "/logs" in path:
             campaign_id = path.split("/")[-2]
             return _campaign_logs(campaign_id, user_id, qs)
 
-        # Single campaign
+        if method == "PATCH" and re.match(r".*/campaigns/[^/]+$", path):
+            campaign_id = path.split("/")[-1]
+            body = json.loads(event.get("body") or "{}")
+            return _edit_campaign(campaign_id, body, user_id)
+
         if method == "GET" and re.match(r".*/campaigns/[^/]+$", path):
             campaign_id = path.split("/")[-1]
             return _get_campaign(campaign_id, user_id)
 
-        # Campaign list
         if method == "GET" and path.endswith("/campaigns"):
             return _list_campaigns(user_id, qs)
 
-        # Create campaign
         if method == "POST" and path.endswith("/campaigns"):
             body = json.loads(event.get("body") or "{}")
             return _create_campaign(body, user_id)
@@ -101,12 +108,10 @@ def _create_campaign(body, user_id):
     if missing:
         return _err(400, f"Missing: {', '.join(sorted(missing))}")
 
-    # Verify account belongs to user
     account = accounts_t.get_item(Key={"account_id": body["mail_account_id"]}).get("Item")
     if not account or account.get("user_id") != user_id:
         return _err(404, "Mail account not found")
 
-    # Build recipient list
     recipients = _resolve_recipients(body, user_id)
     if not recipients:
         return _err(400, "No valid recipients provided")
@@ -139,25 +144,120 @@ def _create_campaign(body, user_id):
     return _ok(_safe_campaign(item), status=201)
 
 
+# ── Edit campaign (draft only) ────────────────────────────────────────────
+
+def _edit_campaign(campaign_id, body, user_id):
+    item = campaigns_t.get_item(Key={"campaign_id": campaign_id}).get("Item")
+    if not item or item.get("user_id") != user_id:
+        return _err(404, "Campaign not found")
+    if item.get("status") != "draft":
+        return _err(409, "Only draft campaigns can be edited")
+
+    updates = {}
+    expr_names  = {}
+    expr_values = {}
+
+    editable = {"name", "subject", "html_body", "text_body", "mail_account_id"}
+    for field in editable:
+        if field in body:
+            if field == "mail_account_id":
+                account = accounts_t.get_item(Key={"account_id": body["mail_account_id"]}).get("Item")
+                if not account or account.get("user_id") != user_id:
+                    return _err(404, "Mail account not found")
+                updates["mail_account_id"] = body["mail_account_id"]
+                updates["from_email"]      = account["from_email"]
+                updates["from_name"]       = account.get("from_name", "")
+            else:
+                updates[field] = body[field]
+
+    # Re-resolve recipients if any recipient fields are present
+    recipient_keys = {"recipients", "extraction_id", "recipients_csv", "recipients_json"}
+    if recipient_keys & body.keys():
+        recipients = _resolve_recipients(body, user_id)
+        if not recipients:
+            return _err(400, "No valid recipients provided")
+        updates["recipients"]      = recipients
+        updates["recipient_count"] = len(recipients)
+
+    if not updates:
+        return _err(400, "Nothing to update")
+
+    set_parts = []
+    for i, (k, v) in enumerate(updates.items()):
+        name_key  = f"#f{i}"
+        value_key = f":v{i}"
+        expr_names[name_key]  = k
+        expr_values[value_key] = v
+        set_parts.append(f"{name_key} = {value_key}")
+
+    campaigns_t.update_item(
+        Key={"campaign_id": campaign_id},
+        UpdateExpression="SET " + ", ".join(set_parts),
+        ExpressionAttributeNames=expr_names,
+        ExpressionAttributeValues=expr_values,
+    )
+
+    updated = campaigns_t.get_item(Key={"campaign_id": campaign_id}).get("Item", {})
+    return _ok(_safe_campaign(_from_dynamo(updated)))
+
+
+# ── Resolve recipients ────────────────────────────────────────────────────
+
 def _resolve_recipients(body, user_id):
-    emails = set()
+    """
+    Returns a deduplicated list of recipient dicts:
+      [{"email": "...", "first_name": "...", ...}, ...]
 
-    # Manual list
-    for e in body.get("recipients", []):
-        if _valid_email(e):
-            emails.add(e.lower().strip())
+    Accepts:
+    - recipients: list of strings OR list of dicts (with at least "email")
+    - recipients_csv: CSV string with a header row containing "email" column
+    - recipients_json: JSON string of the list of dicts
+    - extraction_id: pull emails from a prior extraction (email-only, no extra vars)
+    """
+    seen   = {}   # email → dict
 
-    # From a previous extraction
+    def _add(record):
+        if isinstance(record, str):
+            record = {"email": record.strip().lower()}
+        email = str(record.get("email", "")).strip().lower()
+        if _valid_email(email):
+            merged = {k: v for k, v in record.items() if k != "email"}
+            merged["email"] = email
+            seen[email] = merged
+
+    # Plain list / dict list
+    for r in body.get("recipients", []):
+        _add(r)
+
+    # CSV string
+    csv_raw = body.get("recipients_csv", "")
+    if csv_raw:
+        reader = csv.DictReader(io.StringIO(csv_raw.strip()))
+        if reader.fieldnames and "email" in [f.lower().strip() for f in reader.fieldnames]:
+            # normalise header names
+            reader.fieldnames = [f.strip().lower() for f in reader.fieldnames]
+            for row in reader:
+                _add({k: v.strip() for k, v in row.items()})
+
+    # JSON string
+    json_raw = body.get("recipients_json", "")
+    if json_raw:
+        try:
+            for r in json.loads(json_raw):
+                _add(r)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    # From a previous extraction (email-only)
     extraction_id = body.get("extraction_id")
     if extraction_id:
         ext = extractions_t.get_item(Key={"extraction_id": extraction_id}).get("Item")
         if ext and ext.get("user_id") == user_id:
             for url_emails in ext.get("emails", {}).values():
                 for e in url_emails:
-                    if _valid_email(e):
-                        emails.add(e.lower().strip())
+                    _add(e)
 
-    return sorted(emails)
+    return sorted(seen.values(), key=lambda r: r["email"])
 
 
 # ── List campaigns ────────────────────────────────────────────────────────
@@ -197,11 +297,13 @@ def _send_campaign(campaign_id, user_id):
     if not recipients:
         return _err(400, "No recipients")
 
+    # Normalise legacy string recipients to dicts
+    recipients = [r if isinstance(r, dict) else {"email": r} for r in recipients]
+
     # Remove suppressed emails
-    active = [r for r in recipients if not _is_suppressed(r)]
+    active  = [r for r in recipients if not _is_suppressed(r["email"])]
     skipped = len(recipients) - len(active)
 
-    # Push chunks to SQS
     for i in range(0, len(active), CHUNK_SIZE):
         chunk = active[i:i + CHUNK_SIZE]
         sqs.send_message(
@@ -233,7 +335,6 @@ def _send_campaign(campaign_id, user_id):
 # ── Campaign logs ─────────────────────────────────────────────────────────
 
 def _campaign_logs(campaign_id, user_id, qs):
-    # Verify ownership
     item = campaigns_t.get_item(Key={"campaign_id": campaign_id}).get("Item")
     if not item or item.get("user_id") != user_id:
         return _err(404, "Campaign not found")
@@ -266,8 +367,7 @@ def _list_extractions(user_id, qs):
 # ── Helpers ───────────────────────────────────────────────────────────────
 
 def _is_suppressed(email):
-    resp = suppression_t.get_item(Key={"email": email.lower()})
-    return bool(resp.get("Item"))
+    return bool(suppression_t.get_item(Key={"email": email.lower()}).get("Item"))
 
 
 def _valid_email(email):
@@ -275,13 +375,13 @@ def _valid_email(email):
 
 
 def _safe_campaign(item):
-    """Drop the full recipients list from API responses (can be thousands of emails)."""
+    """Drop the full recipients list from API responses (can be thousands of rows)."""
     return {k: v for k, v in item.items() if k != "recipients"}
 
 
 def _from_dynamo(obj):
-    if isinstance(obj, dict):  return {k: _from_dynamo(v) for k, v in obj.items()}
-    if isinstance(obj, list):  return [_from_dynamo(v) for v in obj]
+    if isinstance(obj, dict):    return {k: _from_dynamo(v) for k, v in obj.items()}
+    if isinstance(obj, list):    return [_from_dynamo(v) for v in obj]
     if isinstance(obj, Decimal): return int(obj) if obj == obj.to_integral_value() else float(obj)
     return obj
 

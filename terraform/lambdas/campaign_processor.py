@@ -84,52 +84,53 @@ def _process_chunk(msg):
     smtp_conn = None
 
     try:
-        # Open a single SMTP connection for the whole chunk
         smtp_conn = _open_smtp(account, password, ctx)
 
         for recipient in recipients:
-            log_id = str(uuid.uuid4())
-            now    = datetime.now(timezone.utc).isoformat()
+            # Normalise: accept both plain string and dict
+            if isinstance(recipient, str):
+                recipient = {"email": recipient}
+            recipient_email = recipient["email"]
+            log_id  = str(uuid.uuid4())
+            now     = datetime.now(timezone.utc).isoformat()
             expires = int((datetime.now(timezone.utc) + timedelta(days=90)).timestamp())
 
-            # Check suppression list
-            if _is_suppressed(recipient):
+            if _is_suppressed(recipient_email):
                 _write_log(log_id, campaign_id, account["user_id"],
-                           recipient, "suppressed", now, expires)
+                           recipient_email, "suppressed", now, expires)
                 continue
 
             try:
                 mime_msg = _build_mime(campaign, account, recipient, log_id)
-                smtp_conn.sendmail(account["from_email"], [recipient], mime_msg.as_string())
+                smtp_conn.sendmail(account["from_email"], [recipient_email], mime_msg.as_string())
                 _write_log(log_id, campaign_id, account["user_id"],
-                           recipient, "sent", now, expires)
+                           recipient_email, "sent", now, expires)
                 sent += 1
-                time.sleep(0.1)   # polite rate limiting
+                time.sleep(0.1)
 
             except smtplib.SMTPRecipientsRefused:
                 _write_log(log_id, campaign_id, account["user_id"],
-                           recipient, "bounced", now, expires,
+                           recipient_email, "bounced", now, expires,
                            error="Recipient refused by server")
-                _suppress(recipient, "bounce")
+                _suppress(recipient_email, "bounce")
                 bounced += 1
 
             except smtplib.SMTPServerDisconnected:
-                # Reconnect and retry once
                 try:
                     smtp_conn = _open_smtp(account, password, ctx)
                     mime_msg  = _build_mime(campaign, account, recipient, log_id)
-                    smtp_conn.sendmail(account["from_email"], [recipient], mime_msg.as_string())
+                    smtp_conn.sendmail(account["from_email"], [recipient_email], mime_msg.as_string())
                     _write_log(log_id, campaign_id, account["user_id"],
-                               recipient, "sent", now, expires)
+                               recipient_email, "sent", now, expires)
                     sent += 1
                 except Exception as retry_err:
                     _write_log(log_id, campaign_id, account["user_id"],
-                               recipient, "failed", now, expires, error=str(retry_err))
+                               recipient_email, "failed", now, expires, error=str(retry_err))
                     failed += 1
 
             except Exception as e:
                 _write_log(log_id, campaign_id, account["user_id"],
-                           recipient, "failed", now, expires, error=str(e))
+                           recipient_email, "failed", now, expires, error=str(e))
                 failed += 1
 
     finally:
@@ -173,23 +174,31 @@ def _open_smtp(account, password, ctx):
 
 
 def _build_mime(campaign, account, recipient, log_id):
+    """
+    recipient is a dict with at least {"email": "..."} plus optional template vars.
+    All {{variable}} tokens in subject, html_body, and text_body are substituted.
+    """
+    vars_ctx = {k: v for k, v in recipient.items() if k != "email"}
+    vars_ctx["email"]            = recipient["email"]
+    vars_ctx["unsubscribe_link"] = f"{APP_URL}/unsubscribe?id={log_id}"
+
+    subject  = _substitute(campaign["subject"],   vars_ctx)
+    html_raw = _substitute(campaign["html_body"],  vars_ctx)
+    text_raw = _substitute(campaign.get("text_body") or _strip_html(campaign["html_body"]), vars_ctx)
+
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = campaign["subject"]
-    msg["From"]    = (
+    msg["Subject"]          = subject
+    msg["From"]             = (
         f"{account['from_name']} <{account['from_email']}>"
-        if account.get("from_name")
-        else account["from_email"]
+        if account.get("from_name") else account["from_email"]
     )
-    msg["To"]                = recipient
-    msg["List-Unsubscribe"]  = f"<{APP_URL}/unsubscribe?id={log_id}>"
-    msg["X-MeshParse-Log"]   = log_id
+    msg["To"]               = recipient["email"]
+    msg["List-Unsubscribe"] = f"<{APP_URL}/unsubscribe?id={log_id}>"
+    msg["X-MeshParse-Log"]  = log_id
 
-    # Plain text
-    plain = campaign.get("text_body") or _strip_html(campaign["html_body"])
-    msg.attach(MIMEText(plain, "plain", "utf-8"))
+    msg.attach(MIMEText(text_raw, "plain", "utf-8"))
 
-    # HTML — inject unsubscribe footer
-    html = campaign["html_body"] + (
+    html = html_raw + (
         f'<br><br><hr style="border:none;border-top:1px solid #eee">'
         f'<p style="font-size:12px;color:#999;text-align:center">'
         f'<a href="{APP_URL}/unsubscribe?id={log_id}" style="color:#999">Unsubscribe</a></p>'
@@ -197,6 +206,14 @@ def _build_mime(campaign, account, recipient, log_id):
     msg.attach(MIMEText(html, "html", "utf-8"))
 
     return msg
+
+
+def _substitute(template: str, ctx: dict) -> str:
+    """Replace {{variable}} tokens; unknown variables are left as-is."""
+    def replace(m):
+        key = m.group(1).strip()
+        return str(ctx[key]) if key in ctx else m.group(0)
+    return re.sub(r"\{\{(\w+)\}\}", replace, template)
 
 
 def _strip_html(html: str) -> str:

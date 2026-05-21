@@ -17,6 +17,7 @@ interface MailAccount {
 
 interface Campaign {
   campaign_id: string; name: string; status: string; subject: string
+  html_body: string; text_body?: string; mail_account_id: string
   recipient_count: number; sent_count: number; bounced_count: number; failed_count: number
   from_email: string; created_at: string; sent_at: string | null
 }
@@ -139,16 +140,19 @@ export default function Dashboard() {
   const [acctTls, setAcctTls] = useState(true)
   const [savingAccount, setSavingAccount] = useState(false)
 
-  // Campaign builder
+  // Campaign builder / editor
   const [showCampaignForm, setShowCampaignForm] = useState(false)
+  const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null)
   const [campName, setCampName] = useState('')
   const [campAccount, setCampAccount] = useState('')
   const [campSubject, setCampSubject] = useState('')
   const [campHtml, setCampHtml] = useState('')
   const [campText, setCampText] = useState('')
-  const [campRecipientMode, setCampRecipientMode] = useState<'paste' | 'extraction'>('paste')
+  const [campRecipientMode, setCampRecipientMode] = useState<'paste' | 'csv' | 'json' | 'extraction'>('paste')
   const [campEmailsPasted, setCampEmailsPasted] = useState('')
   const [campExtractionId, setCampExtractionId] = useState('')
+  const [showVarHints, setShowVarHints] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
   const [creatingCampaign, setCreatingCampaign] = useState(false)
   const [sendingCampaign, setSendingCampaign] = useState<string | null>(null)
 
@@ -622,7 +626,12 @@ export default function Dashboard() {
                   <button
                     onClick={() => {
                       if (mailAccounts.length === 0) { showToast('Add a mail account first', 'error'); setShowAccountForm(true); return }
-                      setShowCampaignForm(v => !v); setSelectedCampaign(null)
+                      if (showCampaignForm) {
+                        setShowCampaignForm(false); setEditingCampaignId(null)
+                        setCampName(''); setCampAccount(''); setCampSubject(''); setCampHtml(''); setCampText(''); setCampEmailsPasted('')
+                      } else {
+                        setEditingCampaignId(null); setShowCampaignForm(true); setSelectedCampaign(null)
+                      }
                     }}
                     className="text-xs px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5 transition-colors text-zinc-300">
                     {showCampaignForm ? 'Cancel' : '+ New campaign'}
@@ -630,9 +639,11 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* Campaign builder */}
+              {/* Campaign builder / editor */}
               {showCampaignForm && (
                 <div className="p-6 border-b border-white/5 space-y-5">
+                  <h3 className="text-sm font-bold text-zinc-300">{editingCampaignId ? 'Edit campaign' : 'New campaign'}</h3>
+
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">Campaign name</label>
@@ -652,23 +663,83 @@ export default function Dashboard() {
                       </select>
                     </div>
                   </div>
+
+                  {/* Subject */}
                   <div>
                     <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">Subject line</label>
-                    <input value={campSubject} onChange={e => setCampSubject(e.target.value)} placeholder="Your email subject"
+                    <input value={campSubject} onChange={e => setCampSubject(e.target.value)}
+                      placeholder="Hi {{first_name}}, we have something for you…"
                       className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
                       style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}/>
                   </div>
+
+                  {/* HTML body + variable hint toggle */}
                   <div>
-                    <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">HTML body</label>
-                    <textarea value={campHtml} onChange={e => setCampHtml(e.target.value)} rows={6}
-                      placeholder="<h1>Hello!</h1><p>Your message here...</p>"
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">HTML body</label>
+                      <div className="flex gap-2">
+                        <button onClick={() => setShowVarHints(v => !v)}
+                          className="text-[10px] px-2 py-1 rounded border border-cyan-500/20 text-cyan-400 hover:bg-cyan-500/10 transition-colors">
+                          {showVarHints ? 'Hide' : '{ } Variables'}
+                        </button>
+                        <button onClick={() => setShowPreview(v => !v)}
+                          className="text-[10px] px-2 py-1 rounded border border-white/10 text-zinc-400 hover:bg-white/5 transition-colors">
+                          {showPreview ? 'Hide preview' : 'Preview'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {showVarHints && (
+                      <div className="mb-3 p-4 rounded-lg border border-cyan-500/20 text-xs space-y-2"
+                        style={{ background: 'rgba(6,182,212,0.04)' }}>
+                        <p className="font-semibold text-cyan-400 mb-2">Template variables — use in subject or HTML body</p>
+                        <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
+                          {[
+                            ['{{email}}', 'Recipient email address'],
+                            ['{{first_name}}', 'First name (from CSV/JSON)'],
+                            ['{{last_name}}', 'Last name (from CSV/JSON)'],
+                            ['{{company}}', 'Company name (from CSV/JSON)'],
+                            ['{{unsubscribe_link}}', 'One-click unsubscribe URL'],
+                          ].map(([v, desc]) => (
+                            <div key={v} className="flex items-baseline gap-2">
+                              <code className="text-cyan-300 font-mono flex-shrink-0">{v}</code>
+                              <span className="text-zinc-500">{desc}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-zinc-600 mt-2">Any column in your CSV becomes a variable. Unknown variables are left as-is.</p>
+                        <p className="text-zinc-500 font-semibold mt-1">CSV example:</p>
+                        <pre className="text-zinc-400 font-mono text-[11px] bg-black/20 rounded p-2">email,first_name,company{'\n'}jane@acme.com,Jane,Acme Corp{'\n'}bob@corp.com,Bob,Corp Inc</pre>
+                      </div>
+                    )}
+
+                    <textarea value={campHtml} onChange={e => setCampHtml(e.target.value)} rows={8}
+                      placeholder={"<h1>Hello {{first_name}}!</h1>\n<p>We're reaching out to {{company}}…</p>"}
                       className="w-full px-3 py-2.5 rounded-lg text-sm outline-none font-mono resize-y"
                       style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}/>
+
+                    {showPreview && campHtml && (
+                      <div className="mt-3 rounded-lg border border-white/10 overflow-hidden">
+                        <div className="px-3 py-1.5 border-b border-white/5 text-[10px] text-zinc-500 uppercase tracking-wider">
+                          Preview (sample data: first_name=Alex, company=Acme)
+                        </div>
+                        <div className="bg-white p-4 text-black text-sm max-h-72 overflow-y-auto"
+                          dangerouslySetInnerHTML={{ __html:
+                            campHtml
+                              .replace(/\{\{first_name\}\}/g, 'Alex')
+                              .replace(/\{\{last_name\}\}/g, 'Smith')
+                              .replace(/\{\{company\}\}/g, 'Acme')
+                              .replace(/\{\{email\}\}/g, 'alex@acme.com')
+                              .replace(/\{\{unsubscribe_link\}\}/g, '#')
+                          }}/>
+                      </div>
+                    )}
                   </div>
+
                   <div>
-                    <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">Plain text (optional — auto-generated if empty)</label>
+                    <label className="block text-xs font-semibold text-zinc-400 mb-1.5 uppercase tracking-wider">Plain text (optional)</label>
                     <textarea value={campText} onChange={e => setCampText(e.target.value)} rows={3}
-                      placeholder="Plain text fallback..."
+                      placeholder="Plain text fallback — auto-stripped from HTML if empty"
                       className="w-full px-3 py-2.5 rounded-lg text-sm outline-none resize-y"
                       style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}/>
                   </div>
@@ -678,78 +749,121 @@ export default function Dashboard() {
                     <label className="block text-xs font-semibold text-zinc-400 mb-2 uppercase tracking-wider">Recipients</label>
                     <div className="flex gap-1 p-1 rounded-lg w-fit mb-3" style={{ background: '#0a0c14', border: '1px solid #ffffff10' }}>
                       {[
-                        { id: 'paste', label: 'Paste emails' },
-                        { id: 'extraction', label: 'From extraction' },
+                        { id: 'paste', label: 'Emails' },
+                        { id: 'csv', label: 'CSV' },
+                        { id: 'json', label: 'JSON' },
+                        { id: 'extraction', label: 'Extraction' },
                       ].map(m => (
-                        <button key={m.id} onClick={() => setCampRecipientMode(m.id as 'paste' | 'extraction')}
-                          className={`px-4 py-1.5 rounded text-xs font-semibold transition-all ${
+                        <button key={m.id} onClick={() => setCampRecipientMode(m.id as typeof campRecipientMode)}
+                          className={`px-3 py-1.5 rounded text-xs font-semibold transition-all ${
                             campRecipientMode === m.id ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-zinc-300'
                           }`}>{m.label}</button>
                       ))}
                     </div>
 
-                    {campRecipientMode === 'paste' ? (
-                      <textarea value={campEmailsPasted} onChange={e => setCampEmailsPasted(e.target.value)} rows={4}
-                        placeholder={"one@example.com\ntwo@example.com\nthree@example.com"}
-                        className="w-full px-3 py-2.5 rounded-lg text-sm outline-none font-mono resize-y"
-                        style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}/>
-                    ) : (
+                    {campRecipientMode === 'paste' && (
                       <div>
-                        {extractions.length === 0 ? (
-                          <p className="text-sm text-zinc-600 py-4">No extractions yet — run email extraction first to build a recipient list.</p>
-                        ) : (
-                          <select value={campExtractionId} onChange={e => setCampExtractionId(e.target.value)}
-                            className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
-                            style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}>
-                            <option value="">— select extraction —</option>
-                            {extractions.map(ex => (
-                              <option key={ex.extraction_id} value={ex.extraction_id}>
-                                {ex.email_count} emails · {ex.urls.slice(0,2).join(', ')}{ex.urls.length > 2 ? ` +${ex.urls.length - 2}` : ''} · {new Date(ex.created_at).toLocaleDateString()}
-                              </option>
-                            ))}
-                          </select>
-                        )}
+                        <p className="text-xs text-zinc-600 mb-2">One email per line, or comma/semicolon separated. No variable support — use CSV for that.</p>
+                        <textarea value={campEmailsPasted} onChange={e => setCampEmailsPasted(e.target.value)} rows={4}
+                          placeholder={"one@example.com\ntwo@example.com\nthree@example.com"}
+                          className="w-full px-3 py-2.5 rounded-lg text-sm outline-none font-mono resize-y"
+                          style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}/>
                       </div>
+                    )}
+
+                    {campRecipientMode === 'csv' && (
+                      <div>
+                        <p className="text-xs text-zinc-600 mb-2">Header row required. Must include an <code className="text-cyan-400">email</code> column. Extra columns become template variables.</p>
+                        <textarea value={campEmailsPasted} onChange={e => setCampEmailsPasted(e.target.value)} rows={6}
+                          placeholder={"email,first_name,company\njane@acme.com,Jane,Acme Corp\nbob@corp.com,Bob,Corp Inc"}
+                          className="w-full px-3 py-2.5 rounded-lg text-sm outline-none font-mono resize-y"
+                          style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}/>
+                      </div>
+                    )}
+
+                    {campRecipientMode === 'json' && (
+                      <div>
+                        <p className="text-xs text-zinc-600 mb-2">Array of objects. Each must have an <code className="text-cyan-400">email</code> field. Extra fields become template variables.</p>
+                        <textarea value={campEmailsPasted} onChange={e => setCampEmailsPasted(e.target.value)} rows={6}
+                          placeholder={'[\n  {"email": "jane@acme.com", "first_name": "Jane", "company": "Acme"},\n  {"email": "bob@corp.com", "first_name": "Bob"}\n]'}
+                          className="w-full px-3 py-2.5 rounded-lg text-sm outline-none font-mono resize-y"
+                          style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}/>
+                      </div>
+                    )}
+
+                    {campRecipientMode === 'extraction' && (
+                      extractions.length === 0 ? (
+                        <p className="text-sm text-zinc-600 py-4">No extractions yet — run email extraction first.</p>
+                      ) : (
+                        <select value={campExtractionId} onChange={e => setCampExtractionId(e.target.value)}
+                          className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
+                          style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}>
+                          <option value="">— select extraction —</option>
+                          {extractions.map(ex => (
+                            <option key={ex.extraction_id} value={ex.extraction_id}>
+                              {ex.email_count} emails · {ex.urls.slice(0,2).join(', ')}{ex.urls.length > 2 ? ` +${ex.urls.length - 2}` : ''} · {new Date(ex.created_at).toLocaleDateString()}
+                            </option>
+                          ))}
+                        </select>
+                      )
                     )}
                   </div>
 
                   <button
                     disabled={creatingCampaign || !campName || !campAccount || !campSubject || !campHtml ||
-                      (campRecipientMode === 'paste' && !campEmailsPasted.trim()) ||
-                      (campRecipientMode === 'extraction' && !campExtractionId)}
+                      (!editingCampaignId && campRecipientMode === 'paste' && !campEmailsPasted.trim()) ||
+                      (!editingCampaignId && campRecipientMode === 'csv'   && !campEmailsPasted.trim()) ||
+                      (!editingCampaignId && campRecipientMode === 'json'  && !campEmailsPasted.trim()) ||
+                      (!editingCampaignId && campRecipientMode === 'extraction' && !campExtractionId)}
                     onClick={async () => {
                       if (!apiKey) return
                       setCreatingCampaign(true)
-                      const recipients = campRecipientMode === 'paste'
-                        ? campEmailsPasted.split(/[\n,;]+/).map(e => e.trim()).filter(Boolean)
-                        : []
+
+                      const recipientPayload: Record<string, unknown> = {}
+                      if (campRecipientMode === 'paste') {
+                        recipientPayload.recipients = campEmailsPasted.split(/[\n,;]+/).map(e => e.trim()).filter(Boolean)
+                      } else if (campRecipientMode === 'csv') {
+                        recipientPayload.recipients_csv = campEmailsPasted
+                      } else if (campRecipientMode === 'json') {
+                        recipientPayload.recipients_json = campEmailsPasted
+                      } else if (campRecipientMode === 'extraction') {
+                        recipientPayload.extraction_id = campExtractionId
+                      }
+
                       try {
-                        const res = await fetch(`${API}/campaigns`, {
-                          method: 'POST',
+                        const isEdit = !!editingCampaignId
+                        const url    = isEdit ? `${API}/campaigns/${editingCampaignId}` : `${API}/campaigns`
+                        const method = isEdit ? 'PATCH' : 'POST'
+
+                        const body: Record<string, unknown> = {
+                          name: campName, mail_account_id: campAccount,
+                          subject: campSubject, html_body: campHtml,
+                          text_body: campText || undefined,
+                          ...recipientPayload,
+                        }
+
+                        const res = await fetch(url, {
+                          method,
                           headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            name: campName, mail_account_id: campAccount,
-                            subject: campSubject, html_body: campHtml,
-                            text_body: campText || undefined,
-                            recipients,
-                            extraction_id: campRecipientMode === 'extraction' ? campExtractionId : undefined,
-                          }),
+                          body: JSON.stringify(body),
                         })
                         const data = await res.json()
                         if (data.error) { showToast(data.error, 'error') }
                         else {
-                          showToast(`Campaign "${campName}" created`)
-                          setShowCampaignForm(false)
+                          showToast(isEdit ? 'Campaign updated' : `Campaign "${campName}" created`)
+                          setShowCampaignForm(false); setEditingCampaignId(null)
                           setCampName(''); setCampAccount(''); setCampSubject(''); setCampHtml(''); setCampText('')
                           setCampEmailsPasted(''); setCampExtractionId('')
                           loadCampaignsData(apiKey)
                         }
-                      } catch { showToast('Could not create campaign', 'error') }
+                      } catch { showToast('Could not save campaign', 'error') }
                       setCreatingCampaign(false)
                     }}
                     className="px-5 py-2.5 font-bold text-sm rounded-lg disabled:opacity-40 transition-all"
                     style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)', color: '#000' }}>
-                    {creatingCampaign ? 'Creating…' : 'Create campaign'}
+                    {creatingCampaign
+                      ? (editingCampaignId ? 'Saving…' : 'Creating…')
+                      : (editingCampaignId ? 'Save changes' : 'Create campaign')}
                   </button>
                 </div>
               )}
@@ -810,26 +924,47 @@ export default function Dashboard() {
                             <div className="flex flex-col items-end gap-2 flex-shrink-0">
                               <span className="text-xs text-zinc-600">{new Date(c.created_at).toLocaleDateString()}</span>
                               {c.status === 'draft' && (
-                                <button
-                                  disabled={sendingCampaign === c.campaign_id}
-                                  onClick={async e => {
-                                    e.stopPropagation()
-                                    if (!apiKey) return
-                                    setSendingCampaign(c.campaign_id)
-                                    try {
-                                      const res = await fetch(`${API}/campaigns/${c.campaign_id}/send`, {
-                                        method: 'POST', headers: { 'X-API-Key': apiKey },
-                                      })
-                                      const data = await res.json()
-                                      if (data.error) showToast(data.error, 'error')
-                                      else { showToast(`Campaign queued — ${data.queued} recipients`); loadCampaignsData(apiKey) }
-                                    } catch { showToast('Could not send campaign', 'error') }
-                                    setSendingCampaign(null)
-                                  }}
-                                  className="text-xs px-3 py-1 rounded-lg font-bold disabled:opacity-50"
-                                  style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)', color: '#000' }}>
-                                  {sendingCampaign === c.campaign_id ? 'Queuing…' : 'Send →'}
-                                </button>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={e => {
+                                      e.stopPropagation()
+                                      setEditingCampaignId(c.campaign_id)
+                                      setCampName(c.name)
+                                      setCampAccount(c.mail_account_id)
+                                      setCampSubject(c.subject)
+                                      setCampHtml(c.html_body)
+                                      setCampText(c.text_body || '')
+                                      setCampEmailsPasted('')
+                                      setCampExtractionId('')
+                                      setCampRecipientMode('paste')
+                                      setShowCampaignForm(true)
+                                      setSelectedCampaign(null)
+                                      window.scrollTo({ top: 0, behavior: 'smooth' })
+                                    }}
+                                    className="text-xs px-3 py-1 rounded-lg border border-white/10 hover:bg-white/5 transition-colors text-zinc-400">
+                                    Edit
+                                  </button>
+                                  <button
+                                    disabled={sendingCampaign === c.campaign_id}
+                                    onClick={async e => {
+                                      e.stopPropagation()
+                                      if (!apiKey) return
+                                      setSendingCampaign(c.campaign_id)
+                                      try {
+                                        const res = await fetch(`${API}/campaigns/${c.campaign_id}/send`, {
+                                          method: 'POST', headers: { 'X-API-Key': apiKey },
+                                        })
+                                        const data = await res.json()
+                                        if (data.error) showToast(data.error, 'error')
+                                        else { showToast(`Campaign queued — ${data.queued} recipients`); loadCampaignsData(apiKey) }
+                                      } catch { showToast('Could not send campaign', 'error') }
+                                      setSendingCampaign(null)
+                                    }}
+                                    className="text-xs px-3 py-1 rounded-lg font-bold disabled:opacity-50"
+                                    style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)', color: '#000' }}>
+                                    {sendingCampaign === c.campaign_id ? 'Queuing…' : 'Send →'}
+                                  </button>
+                                </div>
                               )}
                             </div>
                           </div>

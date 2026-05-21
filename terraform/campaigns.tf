@@ -399,6 +399,14 @@ resource "aws_apigatewayv2_route" "campaign_get" {
   authorization_type = "CUSTOM"
 }
 
+resource "aws_apigatewayv2_route" "campaign_patch" {
+  api_id             = aws_apigatewayv2_api.http.id
+  route_key          = "PATCH /campaigns/{id}"
+  target             = "integrations/${aws_apigatewayv2_integration.campaign.id}"
+  authorizer_id      = aws_apigatewayv2_authorizer.api_key.id
+  authorization_type = "CUSTOM"
+}
+
 resource "aws_apigatewayv2_route" "campaign_send_route" {
   api_id             = aws_apigatewayv2_api.http.id
   route_key          = "POST /campaigns/{id}/send"
