@@ -155,6 +155,12 @@ resource "aws_apigatewayv2_route" "seo_scan_options" {
   target    = "integrations/${aws_apigatewayv2_integration.seo_scan.id}"
 }
 
+resource "aws_apigatewayv2_route" "seo_scan_id_options" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "OPTIONS /seo/scan/{scanId}"
+  target    = "integrations/${aws_apigatewayv2_integration.seo_scan.id}"
+}
+
 resource "aws_apigatewayv2_route" "seo_scans_options" {
   api_id    = aws_apigatewayv2_api.http.id
   route_key = "OPTIONS /seo/scans"
