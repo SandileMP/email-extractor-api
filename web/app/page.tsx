@@ -20,15 +20,15 @@ const PRODUCTS = [
     live: true,
   },
   {
-    tag: 'Coming soon',
+    tag: 'Available now',
     tagColor: '#06b6d4',
     icon: '📈',
     title: 'SEO Intelligence',
-    desc: 'Audit any website for SEO performance. Analyse metadata, backlinks, keyword density, page speed, and get actionable optimisation recommendations.',
-    features: ['On-page SEO audit', 'Keyword analysis', 'Competitor benchmarking', 'Performance scoring'],
-    cta: 'Join waitlist',
+    desc: 'Audit any website for SEO performance. Analyse metadata, headings, images, Open Graph, structured data, and get a ranked list of actionable fixes.',
+    features: ['On-page SEO audit', '100-pt scoring model', 'Deep multi-page crawl', 'Actionable issue list'],
+    cta: 'Start auditing',
     href: '/signup',
-    live: false,
+    live: true,
   },
   {
     tag: 'Coming soon',
@@ -311,7 +311,7 @@ export default function Home() {
                 <ul className="space-y-3 mb-8">
                   {[
                     ['✉️', 'Email Extraction API', true],
-                    ['📈', 'SEO Intelligence', false],
+                    ['📈', 'SEO Intelligence', true],
                     ['📣', 'Email Campaigns', false],
                     ['🔑', 'API key management', true],
                     ['⚡', 'Unlimited API calls', true],
