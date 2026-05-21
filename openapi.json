@@ -42,11 +42,11 @@
                 },
                 "example": {
                   "emails": {
-                    "https://marble.restaurant/": [
-                      "info@marble.restaurant"
+                    "https://example.com/": [
+                      "hello@example.com"
                     ],
-                    "https://www.aurumrestaurant.co.za/": [
-                      "bookings@aurumrestaurant.co.za"
+                    "https://acme.co.za/": [
+                      "info@acme.co.za"
                     ]
                   }
                 }
@@ -103,8 +103,8 @@
             "description": "List of website URLs to scrape (1\u201350 entries, http/https only).",
             "examples": [
               [
-                "https://marble.restaurant/",
-                "https://www.aurumrestaurant.co.za/"
+                "https://example.com/",
+                "https://acme.co.za/"
               ]
             ]
           }
@@ -117,8 +117,8 @@
         "examples": [
           {
             "urls": [
-              "https://marble.restaurant/",
-              "https://www.aurumrestaurant.co.za/"
+              "https://example.com/",
+              "https://acme.co.za/"
             ]
           }
         ]
@@ -137,11 +137,11 @@
             "description": "Map of input URL \u2192 sorted list of unique email addresses found. An empty list means no emails were discovered (or the site was unreachable).",
             "examples": [
               {
-                "https://marble.restaurant/": [
-                  "info@marble.restaurant"
+                "https://example.com/": [
+                  "hello@example.com"
                 ],
-                "https://www.aurumrestaurant.co.za/": [
-                  "bookings@aurumrestaurant.co.za"
+                "https://acme.co.za/": [
+                  "info@acme.co.za"
                 ]
               }
             ]
@@ -155,11 +155,11 @@
         "examples": [
           {
             "emails": {
-              "https://marble.restaurant/": [
-                "info@marble.restaurant"
+              "https://example.com/": [
+                "hello@example.com"
               ],
-              "https://www.aurumrestaurant.co.za/": [
-                "bookings@aurumrestaurant.co.za"
+              "https://acme.co.za/": [
+                "info@acme.co.za"
               ]
             }
           }

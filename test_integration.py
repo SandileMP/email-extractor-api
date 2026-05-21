@@ -31,35 +31,35 @@ class TestHealthEndpoint:
 
 class TestEmailsEndpointLive:
     def test_returns_200_for_valid_url(self):
-        r = post_emails(["https://marble.restaurant/"])
+        r = post_emails(["https://example.com/"])
         assert r.status_code == 200
 
     def test_response_schema(self):
-        r = post_emails(["https://marble.restaurant/"])
+        r = post_emails(["https://example.com/"])
         body = r.json()
         assert "emails" in body
         assert isinstance(body["emails"], dict)
 
     def test_url_key_present_in_response(self):
-        url = "https://marble.restaurant/"
+        url = "https://example.com/"
         r = post_emails([url])
         assert url in r.json()["emails"]
 
-    def test_marble_restaurant_email(self):
-        r = post_emails(["https://marble.restaurant/"])
-        emails = r.json()["emails"].get("https://marble.restaurant/", [])
+    def test_example_email(self):
+        r = post_emails(["https://example.com/"])
+        emails = r.json()["emails"].get("https://example.com/", [])
         assert isinstance(emails, list)
-        assert len(emails) > 0, "Expected at least one email for marble.restaurant"
-        assert any("marble.restaurant" in e for e in emails)
+        assert len(emails) > 0, "Expected at least one email for example.com"
+        assert any("example.com" in e for e in emails)
 
-    def test_aurum_restaurant_email(self):
-        r = post_emails(["https://www.aurumrestaurant.co.za/"])
-        emails = r.json()["emails"].get("https://www.aurumrestaurant.co.za/", [])
+    def test_acme_email(self):
+        r = post_emails(["https://acme.co.za/"])
+        emails = r.json()["emails"].get("https://acme.co.za/", [])
         assert isinstance(emails, list)
-        assert len(emails) > 0, "Expected at least one email for aurumrestaurant.co.za"
+        assert len(emails) > 0, "Expected at least one email for acme.co.za"
 
     def test_multiple_urls(self):
-        urls = ["https://marble.restaurant/", "https://www.aurumrestaurant.co.za/"]
+        urls = ["https://example.com/", "https://acme.co.za/"]
         r = post_emails(urls)
         assert r.status_code == 200
         body = r.json()["emails"]
@@ -82,7 +82,7 @@ class TestEmailsEndpointLive:
         assert list(emails.values())[0] == []
 
     def test_response_emails_are_lists(self):
-        urls = ["https://marble.restaurant/", "https://httpbin.org/html"]
+        urls = ["https://example.com/", "https://httpbin.org/html"]
         r = post_emails(urls)
         for _url, email_list in r.json()["emails"].items():
             assert isinstance(email_list, list)
@@ -90,7 +90,7 @@ class TestEmailsEndpointLive:
     def test_emails_are_valid_format(self):
         import re
         pattern = re.compile(r"^[^@]+@[^@]+\.[^@]+$")
-        r = post_emails(["https://marble.restaurant/"])
+        r = post_emails(["https://example.com/"])
         for _url, email_list in r.json()["emails"].items():
             for email in email_list:
                 assert pattern.match(email), f"Not a valid email: {email}"

@@ -590,7 +590,7 @@ export default function Dashboard() {
                       value={extractPasted}
                       onChange={e => setExtractPasted(e.target.value)}
                       rows={6}
-                      placeholder={"https://marble.restaurant/\nhttps://aurumrestaurant.co.za/\nhttps://example.com/"}
+                      placeholder={"https://example.com/\nhttps://acme.co.za/\nhttps://yoursite.com/"}
                       className="w-full px-4 py-3 rounded-xl text-sm outline-none font-mono resize-y leading-relaxed"
                       style={{ background: '#0a0c14', border: '1px solid #ffffff10', color: 'white' }}
                     />

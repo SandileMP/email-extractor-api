@@ -56,16 +56,16 @@ const REQUEST = `curl -X POST \\
   https://ebfczvv0p2.execute-api.eu-west-1.amazonaws.com/emails \\
   -H "X-API-Key: mp_live_your_key" \\
   -H "Content-Type: application/json" \\
-  -d '{"urls":["https://marble.restaurant/",
-           "https://aurumrestaurant.co.za/"]}'`
+  -d '{"urls":["https://example.com/",
+           "https://acme.co.za/"]}'`
 
 const RESPONSE = `{
   "emails": {
-    "https://marble.restaurant/": [
-      "info@marble.restaurant"
+    "https://example.com/": [
+      "hello@example.com"
     ],
-    "https://aurumrestaurant.co.za/": [
-      "bookings@aurumrestaurant.co.za"
+    "https://acme.co.za/": [
+      "info@acme.co.za"
     ]
   }
 }`

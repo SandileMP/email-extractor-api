@@ -75,7 +75,7 @@ class EmailRequest(BaseModel):
         ...,
         min_length=1,
         description="List of website URLs to scrape (1–50 entries, http/https only).",
-        examples=[["https://marble.restaurant/", "https://www.aurumrestaurant.co.za/"]],
+        examples=[["https://example.com/", "https://acme.co.za/"]],
     )
 
     @field_validator("urls")
@@ -96,8 +96,8 @@ class EmailRequest(BaseModel):
             "examples": [
                 {
                     "urls": [
-                        "https://marble.restaurant/",
-                        "https://www.aurumrestaurant.co.za/",
+                        "https://example.com/",
+                        "https://acme.co.za/",
                     ]
                 }
             ]
@@ -114,8 +114,8 @@ class EmailResponse(BaseModel):
         ),
         examples=[
             {
-                "https://marble.restaurant/": ["info@marble.restaurant"],
-                "https://www.aurumrestaurant.co.za/": ["bookings@aurumrestaurant.co.za"],
+                "https://example.com/": ["hello@example.com"],
+                "https://acme.co.za/": ["info@acme.co.za"],
             }
         ],
     )
@@ -125,10 +125,8 @@ class EmailResponse(BaseModel):
             "examples": [
                 {
                     "emails": {
-                        "https://marble.restaurant/": ["info@marble.restaurant"],
-                        "https://www.aurumrestaurant.co.za/": [
-                            "bookings@aurumrestaurant.co.za"
-                        ],
+                        "https://example.com/": ["hello@example.com"],
+                        "https://acme.co.za/": ["info@acme.co.za"],
                     }
                 }
             ]
@@ -149,10 +147,8 @@ class EmailResponse(BaseModel):
                 "application/json": {
                     "example": {
                         "emails": {
-                            "https://marble.restaurant/": ["info@marble.restaurant"],
-                            "https://www.aurumrestaurant.co.za/": [
-                                "bookings@aurumrestaurant.co.za"
-                            ],
+                            "https://example.com/": ["hello@example.com"],
+                            "https://acme.co.za/": ["info@acme.co.za"],
                         }
                     }
                 }
