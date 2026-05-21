@@ -129,7 +129,7 @@ export default function Dashboard() {
       <nav className="border-b border-white/5 sticky top-0 z-40 backdrop-blur-xl" style={{ background: '#07080f99' }}>
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center font-black text-black text-[11px]">M</div>
+            <img src="/icon.svg" alt="MeshParse" className="w-7 h-7" />
             <span className="font-bold">MeshParse</span>
           </Link>
           <div className="flex items-center gap-4">
