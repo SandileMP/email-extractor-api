@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
 import type { User } from '@supabase/supabase-js'
@@ -9,7 +9,9 @@ const API          = 'https://ebfczvv0p2.execute-api.eu-west-1.amazonaws.com'
 const CHECKOUT_URL = process.env.NEXT_PUBLIC_CHECKOUT_URL!
 
 export default function AccountPage() {
-  const router = useRouter()
+  const router       = useRouter()
+  const searchParams = useSearchParams()
+  const isWelcome    = searchParams.get('welcome') === '1'
   const [user, setUser]           = useState<User | null>(null)
   const [apiKey, setApiKey]       = useState<string | null>(null)
   const [subStatus, setSubStatus] = useState('inactive')
@@ -146,8 +148,26 @@ export default function AccountPage() {
           </div>
         </div>
 
+        {/* Welcome banner — shown only on first arrival from signup */}
+        {isWelcome && !isActive && (
+          <div className="rounded-xl border border-emerald-500/30 p-6"
+            style={{ background: 'linear-gradient(135deg,#0d1a12,#0a0f1e)' }}>
+            <div className="flex items-start gap-4">
+              <span className="text-3xl flex-shrink-0">🎉</span>
+              <div>
+                <p className="font-bold text-emerald-400 mb-1">Account created — one step left</p>
+                <p className="text-sm text-zinc-400">
+                  Subscribe below to unlock Email Extraction, SEO Scanner, and Email Campaigns.
+                  Your API key is provisioned automatically after payment.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Subscription */}
-        <div className="rounded-xl border border-white/5" style={{ background: '#0d0f1a' }}>
+        <div className={`rounded-xl border ${!isActive && isWelcome ? 'border-emerald-500/40' : 'border-white/5'}`}
+          style={{ background: '#0d0f1a' }}>
           <div className="px-6 py-4 border-b border-white/5">
             <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Subscription</h2>
           </div>
@@ -160,16 +180,23 @@ export default function AccountPage() {
               ].map(c => (
                 <div key={c.label}>
                   <p className="text-[10px] text-zinc-600 uppercase tracking-wider mb-1">{c.label}</p>
-                  <p className="text-sm font-semibold text-zinc-200">{c.value}</p>
+                  <p className={`text-sm font-semibold ${c.label === 'Status' && !isActive ? 'text-red-400' : 'text-zinc-200'}`}>
+                    {c.value}
+                  </p>
                 </div>
               ))}
             </div>
             {!isActive && (
-              <button onClick={subscribe} disabled={checkingOut}
-                className="px-6 py-2.5 font-bold text-black rounded-xl text-sm disabled:opacity-50"
-                style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)' }}>
-                {checkingOut ? 'Redirecting…' : 'Subscribe — R999/month →'}
-              </button>
+              <div className="space-y-3">
+                <button onClick={subscribe} disabled={checkingOut}
+                  className="px-6 py-3 font-bold text-black rounded-xl text-sm disabled:opacity-50 transition-all hover:opacity-90"
+                  style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)' }}>
+                  {checkingOut ? 'Redirecting to payment…' : 'Subscribe — R999/month →'}
+                </button>
+                <p className="text-xs text-zinc-600">
+                  Secure payment via Paystack · Cancel anytime · API key issued instantly after payment
+                </p>
+              </div>
             )}
           </div>
         </div>

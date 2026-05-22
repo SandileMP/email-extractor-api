@@ -379,10 +379,60 @@ export default function Dashboard() {
       </nav>
 
       <main className="max-w-5xl mx-auto px-6 py-10">
-        {/* Header + tabs */}
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Dashboard</h1>
         </div>
+
+        {/* ── PAYWALL — shown to inactive/unsubscribed users ───────────── */}
+        {!isActive ? (
+          <div className="max-w-xl mx-auto py-16 text-center space-y-6">
+            <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-2"
+              style={{ background: 'linear-gradient(135deg,#22c55e15,#06b6d415)', border: '1px solid #22c55e20' }}>
+              <span className="text-4xl">🔒</span>
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Subscription required</h2>
+              <p className="text-zinc-400 text-sm leading-relaxed">
+                Weblandr requires an active subscription to access Email Extraction,
+                SEO Scanner, and Email Campaigns. Subscribe to get your API key instantly.
+              </p>
+            </div>
+
+            {/* Feature list */}
+            <div className="rounded-xl border border-white/5 text-left divide-y divide-white/5"
+              style={{ background: '#0d0f1a' }}>
+              {[
+                { icon: '✉️', label: 'Email Extraction',  desc: 'Scrape emails from any website — up to 50 URLs per request' },
+                { icon: '📈', label: 'SEO Scanner',        desc: 'Audit sites for SEO health with a 100-pt scoring model' },
+                { icon: '📣', label: 'Email Campaigns',    desc: 'Send campaigns via your own SMTP with delivery tracking' },
+              ].map(f => (
+                <div key={f.label} className="flex items-center gap-4 px-5 py-4">
+                  <span className="text-2xl flex-shrink-0">{f.icon}</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-zinc-200">{f.label}</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">{f.desc}</p>
+                  </div>
+                  <span className="ml-auto flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
+                    Included
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-3">
+              <Link href="/dashboard/account"
+                className="block w-full py-3.5 font-bold text-black rounded-xl text-sm text-center transition-all hover:opacity-90"
+                style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)' }}>
+                Subscribe — R999/month →
+              </Link>
+              <p className="text-xs text-zinc-600">
+                Secure payment via Paystack · API key issued instantly · Cancel anytime
+              </p>
+            </div>
+          </div>
+        ) : (
+        <>
 
         {/* Tab bar */}
         <div className="flex gap-1 p-1 rounded-xl mb-8 w-fit" style={{ background: '#0d0f1a' }}>
@@ -1697,6 +1747,10 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        </>
+        )}
+
       </main>
     </div>
   )

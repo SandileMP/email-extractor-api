@@ -18,8 +18,9 @@ export default function SignUp() {
     const supabase = createClient()
     const { error: err } = await supabase.auth.signUp({ email, password })
     setLoading(false)
-    if (err) setError(err.message)
-    else router.push('/dashboard')
+    if (err) { setError(err.message); return }
+    // Send new users to the account page to subscribe — no free access
+    router.push('/dashboard/account?welcome=1')
   }
 
   return (
