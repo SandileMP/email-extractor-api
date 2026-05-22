@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
@@ -8,7 +8,8 @@ import type { User } from '@supabase/supabase-js'
 const API          = 'https://ebfczvv0p2.execute-api.eu-west-1.amazonaws.com'
 const CHECKOUT_URL = process.env.NEXT_PUBLIC_CHECKOUT_URL!
 
-export default function AccountPage() {
+// useSearchParams() requires Suspense in static export (Next.js 14)
+function AccountPageInner() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const isWelcome    = searchParams.get('welcome') === '1'
@@ -283,5 +284,17 @@ export default function AccountPage() {
         )}
       </main>
     </div>
+  )
+}
+
+export default function AccountPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#07080f' }}>
+        <div className="w-8 h-8 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+      </div>
+    }>
+      <AccountPageInner />
+    </Suspense>
   )
 }

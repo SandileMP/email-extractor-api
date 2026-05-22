@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -25,13 +25,15 @@ export const metadata: Metadata = {
     description: 'Extract contact emails, analyse SEO, and run email campaigns.',
   },
   icons: {
-    icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
-    ],
+    icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
     apple: '/icon.svg',
     shortcut: '/favicon.svg',
   },
   manifest: '/site.webmanifest',
+}
+
+// themeColor moved to viewport export (Next.js 14+)
+export const viewport: Viewport = {
   themeColor: '#22c55e',
 }
 
