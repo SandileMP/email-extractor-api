@@ -114,8 +114,8 @@ export default function AccountPage() {
             <Link href="/dashboard" className="text-zinc-500 hover:text-white transition-colors text-sm">← Dashboard</Link>
             <span className="text-zinc-700">|</span>
             <Link href="/" className="flex items-center gap-2">
-              <img src="/icon.svg" alt="MeshParse" className="w-6 h-6" />
-              <span className="font-bold text-sm">MeshParse</span>
+              <img src="/icon.svg" alt="Weblandr" className="w-6 h-6" />
+              <span className="font-bold text-sm">Weblandr</span>
             </Link>
           </div>
           <button onClick={logout} className="text-sm text-zinc-400 hover:text-white transition-colors">Sign out</button>
@@ -154,7 +154,7 @@ export default function AccountPage() {
           <div className="p-6">
             <div className="grid grid-cols-3 gap-4 mb-6">
               {[
-                { label: 'Plan',    value: isActive ? 'MeshParse Pro' : 'No plan' },
+                { label: 'Plan',    value: isActive ? 'Weblandr Pro' : 'No plan' },
                 { label: 'Billing', value: isActive ? 'R999 / month'  : '—' },
                 { label: 'Status',  value: isActive ? 'Active'        : 'Inactive' },
               ].map(c => (

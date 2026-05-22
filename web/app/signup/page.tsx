@@ -34,8 +34,8 @@ export default function SignUp() {
       <div className="relative w-full max-w-sm">
         {/* Logo */}
         <Link href="/" className="flex items-center justify-center gap-2 mb-8">
-          <img src="/icon.svg" alt="MeshParse" className="w-8 h-8" />
-          <span className="font-bold text-xl">MeshParse</span>
+          <img src="/icon.svg" alt="Weblandr" className="w-8 h-8" />
+          <span className="font-bold text-xl">Weblandr</span>
         </Link>
 
         <div className="rounded-2xl p-[1px]"

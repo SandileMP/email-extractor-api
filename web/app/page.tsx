@@ -78,8 +78,8 @@ export default function Home() {
       <nav className="fixed top-0 inset-x-0 z-50 border-b border-white/5 backdrop-blur-xl bg-[#07080f]/80">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <img src="/icon.svg" alt="MeshParse" className="w-7 h-7" />
-            <span className="font-bold text-lg tracking-tight">MeshParse</span>
+            <img src="/icon.svg" alt="Weblandr" className="w-7 h-7" />
+            <span className="font-bold text-lg tracking-tight">Weblandr</span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm text-zinc-400">
             <a href="#platform" className="hover:text-white transition-colors">Platform</a>
@@ -262,7 +262,7 @@ export default function Home() {
           <div className="text-center mb-16">
             <span className="text-xs font-bold uppercase tracking-widest text-emerald-500 mb-3 block">Use cases</span>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Built for growth teams</h2>
-            <p className="text-zinc-400 max-w-xl mx-auto">Whether you're a developer, marketer, or founder — MeshParse fits your workflow</p>
+            <p className="text-zinc-400 max-w-xl mx-auto">Whether you're a developer, marketer, or founder — Weblandr fits your workflow</p>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {USE_CASES.map(u => (
@@ -365,11 +365,11 @@ export default function Home() {
       <footer className="border-t border-white/5 py-10 bg-[#07080f]">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <img src="/icon.svg" alt="MeshParse" className="w-6 h-6" />
-            <span className="font-bold text-sm">MeshParse</span>
+            <img src="/icon.svg" alt="Weblandr" className="w-6 h-6" />
+            <span className="font-bold text-sm">Weblandr</span>
             <span className="text-xs text-zinc-700 ml-1">· Web Intelligence Platform</span>
           </div>
-          <span className="text-xs text-zinc-700">© {new Date().getFullYear()} MeshParse · Built on AWS · Secured by Supabase</span>
+          <span className="text-xs text-zinc-700">© 2026 Weblandr · Built on AWS · Secured by Supabase</span>
           <div className="flex items-center gap-6 text-xs text-zinc-500">
             <a href="https://ebfczvv0p2.execute-api.eu-west-1.amazonaws.com/docs" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">API Docs ↗</a>
             <Link href="/login" className="hover:text-white transition-colors">Sign in</Link>

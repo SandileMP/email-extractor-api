@@ -1,6 +1,6 @@
 {
-  "name": "MeshParse",
-  "short_name": "MeshParse",
+  "name": "Weblandr",
+  "short_name": "Weblandr",
   "description": "Web Intelligence Platform — extract emails, analyse SEO, and run campaigns.",
   "start_url": "/",
   "scope": "/",

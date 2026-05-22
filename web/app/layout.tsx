@@ -3,25 +3,25 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: {
-    default: 'MeshParse — Web Intelligence Platform',
-    template: '%s · MeshParse',
+    default: 'Weblandr — Web Intelligence Platform',
+    template: '%s · Weblandr',
   },
   description: 'Extract contact emails, analyse SEO, and run email campaigns — all through a single developer-first API.',
   keywords: ['email extraction', 'web scraping', 'SEO analysis', 'email campaigns', 'lead generation', 'API'],
-  authors: [{ name: 'MeshParse' }],
-  creator: 'MeshParse',
-  metadataBase: new URL('https://meshparse.com'),
+  authors: [{ name: 'Weblandr' }],
+  creator: 'Weblandr',
+  metadataBase: new URL('https://weblandr.com'),
   openGraph: {
     type: 'website',
     locale: 'en_ZA',
-    url: 'https://meshparse.com',
-    siteName: 'MeshParse',
-    title: 'MeshParse — Web Intelligence Platform',
+    url: 'https://weblandr.com',
+    siteName: 'Weblandr',
+    title: 'Weblandr — Web Intelligence Platform',
     description: 'Extract contact emails, analyse SEO, and run email campaigns — all through a single developer-first API.',
   },
   twitter: {
     card: 'summary',
-    title: 'MeshParse — Web Intelligence Platform',
+    title: 'Weblandr — Web Intelligence Platform',
     description: 'Extract contact emails, analyse SEO, and run email campaigns.',
   },
   icons: {
