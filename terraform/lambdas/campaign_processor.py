@@ -25,7 +25,7 @@ LOGS_TABLE        = os.environ.get("EMAIL_LOGS_TABLE",   "meshparse-email-logs")
 ACCOUNTS_TABLE    = os.environ.get("MAIL_ACCOUNTS_TABLE","meshparse-mail-accounts")
 SUPPRESSION_TABLE = os.environ.get("SUPPRESSION_TABLE",  "meshparse-suppression")
 KMS_KEY_ID        = os.environ.get("KMS_KEY_ID", "")
-APP_URL           = os.environ.get("APP_URL", "https://meshparse.com")
+APP_URL           = os.environ.get("APP_URL", "https://weblandr.com")
 REGION            = os.environ.get("AWS_REGION", "eu-west-1")
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)

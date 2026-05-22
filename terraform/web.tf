@@ -139,7 +139,7 @@ resource "aws_amplify_app" "meshparse" {
 
   # Only NEXT_PUBLIC_ vars needed — baked into static bundle at build time
   environment_variables = {
-    NEXT_PUBLIC_APP_URL            = "https://${var.domain_name}"
+    NEXT_PUBLIC_APP_URL            = "https://weblandr.com"
     NEXT_PUBLIC_SUPABASE_URL       = "https://ajyrrxrxcywooyrahioi.supabase.co"
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqeXJyeHJ4Y3l3b295cmFoaW9pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzMDQzNTIsImV4cCI6MjA5NDg4MDM1Mn0.XDu6729rTcHL5M9boQPaB3puoQdvQpWnnqCuHX3B_VI"
     NEXT_PUBLIC_CHECKOUT_URL       = "${aws_apigatewayv2_stage.default.invoke_url}checkout"

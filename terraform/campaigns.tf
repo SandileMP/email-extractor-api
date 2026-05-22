@@ -257,7 +257,7 @@ locals {
     EXTRACTIONS_TABLE   = aws_dynamodb_table.extractions.name
     CAMPAIGN_QUEUE_URL  = aws_sqs_queue.campaign_send.url
     KMS_KEY_ID          = aws_kms_key.campaigns.key_id
-    APP_URL             = "https://meshparse.com"
+    APP_URL             = "https://weblandr.com"
   }
 }
 
