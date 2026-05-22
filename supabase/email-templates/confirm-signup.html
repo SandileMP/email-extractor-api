@@ -1,84 +1,89 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Confirm your Weblandr account</title>
 </head>
-<body style="margin:0;padding:0;background:#07080f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#07080f;padding:40px 16px;">
+<body style="margin:0;padding:0;background-color:#07080f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#07080f;">
     <tr>
-      <td align="center">
-        <table width="100%" style="max-width:520px;" cellpadding="0" cellspacing="0">
+      <td align="center" style="padding:48px 16px 40px;">
+        <table role="presentation" width="100%" style="max-width:480px;" cellpadding="0" cellspacing="0">
 
-          <!-- Logo -->
+          <!-- Logo wordmark -->
           <tr>
             <td align="center" style="padding-bottom:32px;">
-              <table cellpadding="0" cellspacing="0">
-                <tr>
-                  <td style="background:#080c18;border:1px solid rgba(34,197,94,0.2);border-radius:12px;padding:10px 14px;">
-                    <span style="font-size:18px;font-weight:800;letter-spacing:-0.5px;
-                      background:linear-gradient(90deg,#22c55e,#06b6d4);
-                      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-                      color:#22c55e;">Weblandr</span>
-                  </td>
-                </tr>
-              </table>
+              <span style="font-size:22px;font-weight:800;letter-spacing:-0.5px;color:#22c55e;">
+                Weblandr
+              </span>
             </td>
           </tr>
 
           <!-- Card -->
           <tr>
-            <td style="background:#0d0f1a;border:1px solid rgba(255,255,255,0.06);border-radius:20px;padding:40px 40px 36px;">
+            <td style="background-color:#0d0f1a;border-radius:16px;border:1px solid #1f2937;padding:40px 36px 36px;">
 
-              <!-- Heading -->
-              <p style="margin:0 0 8px;font-size:24px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">
-                Confirm your email
-              </p>
-              <p style="margin:0 0 28px;font-size:15px;color:#71717a;line-height:1.6;">
-                Click the button below to confirm your Weblandr account and get started.
+              <!-- Icon -->
+              <p style="margin:0 0 20px;font-size:32px;line-height:1;">✉️</p>
+
+              <!-- Headline -->
+              <p style="margin:0 0 10px;font-size:22px;font-weight:700;color:#f4f4f5;line-height:1.3;">
+                Confirm your email address
               </p>
 
-              <!-- CTA -->
-              <table cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+              <!-- Body -->
+              <p style="margin:0 0 28px;font-size:15px;color:#a1a1aa;line-height:1.6;">
+                You're one step away from accessing Weblandr's Email Extraction, SEO Scanner,
+                and Email Campaigns. Click the button below to verify your address.
+              </p>
+
+              <!-- CTA button -->
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
                 <tr>
-                  <td style="background:linear-gradient(90deg,#22c55e,#16a34a);border-radius:12px;">
+                  <td align="center" bgcolor="#22c55e" style="border-radius:10px;">
                     <a href="{{ .ConfirmationURL }}"
-                      style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;
-                             color:#000000;text-decoration:none;border-radius:12px;">
-                      Confirm account →
+                      style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:700;
+                             color:#000000;text-decoration:none;border-radius:10px;
+                             background-color:#22c55e;mso-padding-alt:0;">
+                      Confirm account &rarr;
                     </a>
                   </td>
                 </tr>
               </table>
 
-              <!-- Fallback link -->
-              <p style="margin:0 0 6px;font-size:12px;color:#52525b;">
-                Or copy and paste this URL into your browser:
+              <!-- Divider -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                <tr>
+                  <td style="border-top:1px solid #1f2937;font-size:0;line-height:0;">&nbsp;</td>
+                </tr>
+              </table>
+
+              <!-- Fallback URL -->
+              <p style="margin:0 0 6px;font-size:12px;color:#71717a;">
+                Button not working? Copy and paste this link into your browser:
               </p>
-              <p style="margin:0 0 28px;font-size:12px;word-break:break-all;">
+              <p style="margin:0 0 24px;font-size:12px;word-break:break-all;">
                 <a href="{{ .ConfirmationURL }}" style="color:#22c55e;text-decoration:none;">
                   {{ .ConfirmationURL }}
                 </a>
               </p>
 
-              <!-- Divider -->
-              <hr style="border:none;border-top:1px solid rgba(255,255,255,0.06);margin:0 0 24px;"/>
-
-              <!-- Note -->
+              <!-- Small print -->
               <p style="margin:0;font-size:12px;color:#52525b;line-height:1.6;">
                 This link expires in <strong style="color:#71717a;">24 hours</strong>.
-                If you didn't create an account, you can safely ignore this email.
+                If you didn't sign up for Weblandr, you can safely ignore this email.
               </p>
+
             </td>
           </tr>
 
           <!-- Footer -->
           <tr>
-            <td align="center" style="padding-top:24px;">
+            <td align="center" style="padding-top:28px;">
               <p style="margin:0;font-size:12px;color:#3f3f46;">
-                © 2026 Weblandr &nbsp;·&nbsp;
-                <a href="https://weblandr.com" style="color:#3f3f46;text-decoration:none;">weblandr.com</a>
+                &copy; 2026 Weblandr &nbsp;&middot;&nbsp;
+                <a href="https://weblandr.com" style="color:#52525b;text-decoration:none;">weblandr.com</a>
               </p>
             </td>
           </tr>
