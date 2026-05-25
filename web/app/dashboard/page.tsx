@@ -163,6 +163,7 @@ export default function Dashboard() {
   const [extractResults, setExtractResults] = useState<Record<string, string[]> | null>(null)
   const [extractError, setExtractError] = useState('')
   const [extractCopied, setExtractCopied] = useState(false)
+  const [extractBatch, setExtractBatch] = useState({ current: 0, total: 0 })
   const [extractHistoryLoading, setExtractHistoryLoading] = useState(false)
   const [extractHistory, setExtractHistory] = useState<Extraction[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -307,7 +308,7 @@ export default function Dashboard() {
           const raw = String(row[col] || '').trim()
           if (!raw) return
           const url = raw.startsWith('http') ? raw : `https://${raw}`
-          if (!urls.includes(url) && urls.length < 50) urls.push(url)
+          if (!urls.includes(url)) urls.push(url)
         })
       })
 
@@ -500,7 +501,7 @@ export default function Dashboard() {
                 {/* ── Paste mode ── */}
                 {extractMode === 'paste' && (
                   <div className="space-y-3 pb-5">
-                    <p className="text-xs text-zinc-600">One URL per line, or comma/space separated. Max 50.</p>
+                    <p className="text-xs text-zinc-600">One URL per line, or comma/space separated. Large lists are processed in batches of 50.</p>
                     <textarea
                       value={extractPasted}
                       onChange={e => setExtractPasted(e.target.value)}
@@ -608,7 +609,7 @@ export default function Dashboard() {
                     {extractManualList.length > 0 ? (
                       <div>
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-semibold text-zinc-400">{extractManualList.length} / 50 URLs</span>
+                          <span className="text-xs font-semibold text-zinc-400">{extractManualList.length} URL{extractManualList.length !== 1 ? 's' : ''}</span>
                           <button onClick={() => setExtractManualList([])}
                             className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">Clear all</button>
                         </div>
@@ -651,6 +652,7 @@ export default function Dashboard() {
                     setExtractError('')
                     setExtractResults(null)
                     setExtracting(true)
+                    setExtractBatch({ current: 0, total: 0 })
 
                     let urls: string[] = []
                     if (extractMode === 'paste') {
@@ -660,29 +662,56 @@ export default function Dashboard() {
                     } else if (extractMode === 'manual') {
                       urls = extractManualList
                     }
-                    urls = Array.from(new Set(urls)).slice(0, 50)
+                    urls = Array.from(new Set(urls))
 
-                    try {
-                      const res = await fetch(`${API}/emails`, {
-                        method: 'POST',
-                        headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ urls }),
-                      })
-                      const data = await res.json()
-                      if (!res.ok || data.error) {
-                        setExtractError(data.error || `HTTP ${res.status}`)
-                      } else {
-                        setExtractResults(data.emails)
-                        loadExtractHistory(apiKey)
+                    // Split into batches of 50 (API Gateway 29s timeout per request)
+                    const BATCH_SIZE = 50
+                    const batches: string[][] = []
+                    for (let i = 0; i < urls.length; i += BATCH_SIZE) {
+                      batches.push(urls.slice(i, i + BATCH_SIZE))
+                    }
+
+                    const merged: Record<string, string[]> = {}
+                    const errors: string[] = []
+
+                    for (let i = 0; i < batches.length; i++) {
+                      setExtractBatch({ current: i + 1, total: batches.length })
+                      try {
+                        const res = await fetch(`${API}/emails`, {
+                          method: 'POST',
+                          headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ urls: batches[i] }),
+                        })
+                        const data = await res.json()
+                        if (!res.ok || data.error) {
+                          errors.push(`Batch ${i + 1}: ${data.error || `HTTP ${res.status}`}`)
+                        } else {
+                          Object.assign(merged, data.emails)
+                          // Show partial results as they arrive
+                          setExtractResults({ ...merged })
+                        }
+                      } catch {
+                        errors.push(`Batch ${i + 1}: network error`)
                       }
-                    } catch { setExtractError('Request failed — check your network and try again') }
+                    }
+
+                    setExtractBatch({ current: 0, total: 0 })
+                    if (Object.keys(merged).length > 0) {
+                      setExtractResults(merged)
+                      loadExtractHistory(apiKey)
+                    }
+                    if (errors.length > 0) {
+                      setExtractError(errors.join(' · '))
+                    }
                     setExtracting(false)
                   }}
                   className="w-full py-3.5 font-bold text-sm rounded-xl transition-all disabled:opacity-40 flex items-center justify-center gap-2"
                   style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)', color: '#000' }}>
                   {extracting
                     ? <><span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"/>
-                        Scraping websites…</>
+                        {extractBatch.total > 1
+                          ? `Batch ${extractBatch.current} of ${extractBatch.total}…`
+                          : 'Scraping websites…'}</>
                     : '→ Extract Emails'}
                 </button>
               </div>
