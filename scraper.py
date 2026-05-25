@@ -26,7 +26,7 @@ EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b")
 # Domains commonly found in obfuscated anti-scraping patterns that aren't real emails
 JUNK_EMAIL_DOMAINS = {"sentry.io", "wixpress.com"}
 
-TIMEOUT = 10
+TIMEOUT = (3, 5)   # (connect_timeout, read_timeout) — 3 s to connect, 5 s to read
 MAX_REDIRECTS = 5
 
 

@@ -664,8 +664,8 @@ export default function Dashboard() {
                     }
                     urls = Array.from(new Set(urls))
 
-                    // Split into batches of 50 (API Gateway 29s timeout per request)
-                    const BATCH_SIZE = 50
+                    // Split into batches of 25 (backend MAX_URLS=25, keeps each Lambda call within API GW's 29s)
+                    const BATCH_SIZE = 25
                     const batches: string[][] = []
                     for (let i = 0; i < urls.length; i += BATCH_SIZE) {
                       batches.push(urls.slice(i, i + BATCH_SIZE))

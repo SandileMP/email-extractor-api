@@ -1,7 +1,8 @@
 import logging
 import os
+import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
 
@@ -39,8 +40,8 @@ app = FastAPI(
         "Both `mailto:` href attributes and plain-text regex matches are used. "
         "Results are lowercased, deduplicated, and sorted alphabetically.\n\n"
         "### Limits\n"
-        "- Maximum **50 URLs** per request\n"
-        "- Per-URL HTTP timeout: **10 seconds**\n"
+        "- Maximum **25 URLs** per request\n"
+        "- Per-URL HTTP timeout: **5 seconds** read / **3 seconds** connect\n"
         "- Lambda execution timeout: **60 seconds**\n\n"
         "### Error behaviour\n"
         "Network errors, DNS failures, and HTTP 4xx/5xx responses are handled gracefully — "
@@ -75,8 +76,9 @@ app.add_middleware(
     max_age=300,
 )
 
-MAX_URLS = 50
-MAX_WORKERS = 10
+MAX_URLS    = 25   # keep each Lambda invocation well within API GW's 29 s timeout
+MAX_WORKERS = 25   # all URLs in a batch run concurrently
+OVERALL_S   = 22   # hard wall-clock budget per request (leaves 7 s buffer before 29 s)
 
 
 class EmailRequest(BaseModel):
@@ -163,7 +165,7 @@ class EmailResponse(BaseModel):
                 }
             },
         },
-        422: {"description": "Validation error — empty list, invalid URL, or > 50 URLs."},
+        422: {"description": "Validation error — empty list, invalid URL, or > 25 URLs."},
     },
 )
 def get_emails(payload: EmailRequest, request: Request) -> EmailResponse:
@@ -175,16 +177,29 @@ def get_emails(payload: EmailRequest, request: Request) -> EmailResponse:
     """
     url_strings = [str(u) for u in payload.urls]
     results: dict[str, list[str]] = {}
+    deadline = time.monotonic() + OVERALL_S
 
     with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(url_strings))) as pool:
         future_to_url = {pool.submit(extract_emails, url): url for url in url_strings}
         for future in as_completed(future_to_url):
             url = future_to_url[future]
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                logger.warning("Budget exhausted, skipping %s", url)
+                results[url] = []
+                continue
             try:
-                results[url] = future.result()
+                results[url] = future.result(timeout=remaining)
+            except FutureTimeoutError:
+                logger.warning("Per-URL budget exceeded for %s", url)
+                results[url] = []
             except Exception as exc:
                 logger.error("Unexpected error for %s: %s", url, exc)
                 results[url] = []
+
+    # Ensure every requested URL appears in the response
+    for u in url_strings:
+        results.setdefault(u, [])
 
     # Persist extraction so users can reference results in campaigns
     _persist_extraction(request, results)
