@@ -14,7 +14,7 @@ resource "aws_lambda_function" "admin" {
   role             = aws_iam_role.campaigns.arn   # reuse campaigns role (has DynamoDB + SQS)
   handler          = "admin.handler"
   runtime          = "python3.12"
-  timeout          = 30
+  timeout          = 60
   memory_size      = 256
   filename         = data.archive_file.admin.output_path
   source_code_hash = data.archive_file.admin.output_base64sha256

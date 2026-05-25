@@ -266,7 +266,7 @@ resource "aws_lambda_function" "mail_account" {
   role             = aws_iam_role.campaigns.arn
   handler          = "mail_account.handler"
   runtime          = "python3.12"
-  timeout          = 30
+  timeout          = 60
   memory_size      = 256
   filename         = data.archive_file.mail_account.output_path
   source_code_hash = data.archive_file.mail_account.output_base64sha256
@@ -279,7 +279,7 @@ resource "aws_lambda_function" "campaign" {
   role             = aws_iam_role.campaigns.arn
   handler          = "campaign.handler"
   runtime          = "python3.12"
-  timeout          = 30
+  timeout          = 60
   memory_size      = 256
   filename         = data.archive_file.campaign.output_path
   source_code_hash = data.archive_file.campaign.output_base64sha256
@@ -292,7 +292,7 @@ resource "aws_lambda_function" "campaign_processor" {
   role             = aws_iam_role.campaigns.arn
   handler          = "campaign_processor.handler"
   runtime          = "python3.12"
-  timeout          = 120
+  timeout          = 300
   memory_size      = 512
   filename         = data.archive_file.campaign_processor.output_path
   source_code_hash = data.archive_file.campaign_processor.output_base64sha256

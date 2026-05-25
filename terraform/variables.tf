@@ -19,7 +19,7 @@ variable "function_name" {
 variable "lambda_timeout" {
   description = "Lambda execution timeout (seconds)"
   type        = number
-  default     = 60
+  default     = 300   # 5 minutes — gives scraper full room; API GW caps client-facing calls at 29 s
 }
 
 variable "lambda_memory" {

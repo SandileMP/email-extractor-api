@@ -62,7 +62,7 @@ resource "aws_lambda_function" "checkout" {
   role             = aws_iam_role.api_lambdas.arn
   handler          = "checkout.handler"
   runtime          = "python3.12"
-  timeout          = 15
+  timeout          = 30
   filename         = data.archive_file.checkout.output_path
   source_code_hash = data.archive_file.checkout.output_base64sha256
 
@@ -92,7 +92,7 @@ resource "aws_lambda_function" "webhook" {
   role             = aws_iam_role.api_lambdas.arn
   handler          = "webhook.handler"
   runtime          = "python3.12"
-  timeout          = 30
+  timeout          = 60
   filename         = data.archive_file.webhook.output_path
   source_code_hash = data.archive_file.webhook.output_base64sha256
 

@@ -91,7 +91,7 @@ resource "aws_lambda_function" "seo_scan" {
   role             = aws_iam_role.seo_scan.arn
   handler          = "seo_scan.handler"
   runtime          = "python3.12"
-  timeout          = 60       # deep scans may fetch several pages
+  timeout          = 120      # deep scans crawl multiple pages; 29 s API GW cap applies to HTTP calls
   memory_size      = 512
   filename         = data.archive_file.seo_scan.output_path
   source_code_hash = data.archive_file.seo_scan.output_base64sha256
